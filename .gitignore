@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.turbo/
+
+# Cloudflare / wrangler
+.wrangler/
+
+# Secrets
+.envrc.enc
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+
+# Build artifacts
+dist/
+
+# OS
+.DS_Store
+
+# Logs
+*.log

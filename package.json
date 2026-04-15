@@ -1,0 +1,16 @@
+{
+  "name": "gc-erp-mcp-server",
+  "private": true,
+  "packageManager": "bun@1.3.10",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "turbo run dev --filter=@gc-erp/mcp-server",
+    "deploy": "turbo run deploy --filter=@gc-erp/mcp-server",
+    "tail": "turbo run tail --filter=@gc-erp/mcp-server",
+    "typecheck": "turbo run typecheck",
+    "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}

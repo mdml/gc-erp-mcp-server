@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "deploy": {
+      "cache": false
+    },
+    "tail": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {},
+    "sync-secrets": {
+      "cache": false
+    }
+  }
+}
