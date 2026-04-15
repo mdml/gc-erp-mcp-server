@@ -1,0 +1,18 @@
+[install]
+# Pin exact versions (no ^ or ~ prefixes)
+exact = true
+
+# Write lockfile as text for diffability and auditing
+saveTextLockfile = true
+
+# Only install package versions published at least 7 days ago.
+# Excludes cover packages whose currently-locked version is fresher than
+# 7 days at lockfile-creation time — Cloudflare ships ~daily and we'd
+# otherwise be stuck on stale Worker types. Trim this list once the
+# locked version ages out.
+minimumReleaseAge = 604800
+minimumReleaseAgeExcludes = [
+  "@cloudflare/workers-types",
+  "agents",
+  "wrangler",
+]

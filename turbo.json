@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["biome.json"],
   "tasks": {
     "dev": {
       "cache": false,
@@ -12,7 +13,9 @@
       "cache": false,
       "persistent": true
     },
+    "lint": {},
     "typecheck": {},
+    "test": {},
     "sync-secrets": {
       "cache": false
     }

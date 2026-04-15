@@ -1,5 +1,5 @@
-import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 
 interface Env {
   MCP_BEARER_TOKEN: string;
@@ -50,7 +50,11 @@ export class GcErpMcp extends McpAgent<Env> {
 const mcp = GcErpMcp.serve("/mcp", { binding: "MCP_OBJECT" });
 
 export default {
-  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    req: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(req.url);
 
     if (url.pathname === "/" && req.method === "GET") {

@@ -181,22 +181,24 @@ async function main() {
   const envrcSecrets = filterTargets("envrc");
   const devVarsSecrets = filterTargets("dev-vars");
 
-  const envrcBody =
-    envrcSecrets
-      .map((s) => `${s.name}=${shellQuote(values[s.name])}`)
-      .join("\n") + "\n";
+  const envrcBody = `${envrcSecrets
+    .map((s) => `${s.name}=${shellQuote(values[s.name])}`)
+    .join("\n")}\n`;
   const encrypted = await ageEncrypt(envrcBody, pubkey);
   const envrcEncPath = join(root, ".envrc.enc");
   writeAtomic(envrcEncPath, encrypted);
 
-  const devVarsBody =
-    devVarsSecrets.map((s) => `${s.name}=${values[s.name]}`).join("\n") + "\n";
+  const devVarsBody = `${devVarsSecrets.map((s) => `${s.name}=${values[s.name]}`).join("\n")}\n`;
   const devVarsPath = join(root, MCP_SERVER_REL, ".dev.vars");
   writeAtomic(devVarsPath, devVarsBody);
 
   console.log();
-  console.log(`  /.envrc.enc                      ← ${envrcSecrets.map((s) => s.name).join(", ")}`);
-  console.log(`  /${MCP_SERVER_REL}/.dev.vars  ← ${devVarsSecrets.map((s) => s.name).join(", ")}`);
+  console.log(
+    `  /.envrc.enc                      ← ${envrcSecrets.map((s) => s.name).join(", ")}`,
+  );
+  console.log(
+    `  /${MCP_SERVER_REL}/.dev.vars  ← ${devVarsSecrets.map((s) => s.name).join(", ")}`,
+  );
   console.log();
   console.log(`age recipient: ${pubkey}`);
   console.log(`age key:       ${keyPath}`);

@@ -32,8 +32,8 @@ Re-run `sync-secrets` to rotate.
 Prereqs (install once, per machine):
 
 ```bash
-brew install age direnv 1password-cli bun     # macOS
-# Linux: apt-get install age direnv; install op + bun per their docs
+brew install age direnv 1password-cli bun lefthook osv-scanner   # macOS
+# Linux: apt-get install age direnv lefthook; install op, bun, osv-scanner per their docs
 ```
 
 Create your age keypair if you don't already have one:
@@ -100,5 +100,19 @@ Add a custom connector / remote MCP server pointing at `https://…workers.dev/m
 - `turbo run dev` — local Worker via Wrangler
 - `turbo run deploy` — ship to Cloudflare
 - `turbo run typecheck` — tsc --noEmit across all packages
+- `turbo run lint` — biome check across all packages
+- `bun run format` — biome check --write --unsafe . (auto-fix at the repo root)
+- `turbo run test` — vitest across all packages
+- `bun run gate` — full quality gate (lint + typecheck + test); also runs on pre-push
 - `turbo run tail` — stream production logs
 - `turbo run sync-secrets` — pull secrets from 1Password
+
+## Quality gates
+
+`bun install` runs `lefthook install` via the `prepare` script, which wires three git hooks:
+
+- **pre-commit** — `turbo run lint` and `turbo run typecheck` in parallel. Biome handles both lint and format from `biome.json`; run `bun run format` to auto-fix anything Biome flags.
+- **commit-msg** — `commitlint` enforces [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `chore:`, …). Allowed types are the standard set; no research-specific extensions.
+- **pre-push** — runs `bun run gate` (the full lint + typecheck + test sweep) and then `osv-scanner` against `bun.lock` for known vulnerabilities.
+
+Bun's lockfile is text-mode and `bunfig.toml` pins versions exactly with a 7-day minimum release age (supply-chain hardening — see the `minimumReleaseAgeExcludes` list for the few packages currently exempt because their locked version is fresher than the policy).

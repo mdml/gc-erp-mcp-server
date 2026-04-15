@@ -1,0 +1,22 @@
+# Lefthook — local git hooks
+# Install: lefthook install (runs automatically via `prepare` on bun install)
+
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: turbo run lint
+    typecheck:
+      run: turbo run typecheck
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}
+
+pre-push:
+  commands:
+    full-gate:
+      run: bun run gate
+    osv-scan:
+      run: osv-scanner scan --config=osv-scanner.toml --lockfile=bun.lock

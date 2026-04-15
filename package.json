@@ -2,15 +2,27 @@
   "name": "gc-erp-mcp-server",
   "private": true,
   "packageManager": "bun@1.3.10",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
+    "prepare": "lefthook install",
     "dev": "turbo run dev --filter=@gc-erp/mcp-server",
     "deploy": "turbo run deploy --filter=@gc-erp/mcp-server",
     "tail": "turbo run tail --filter=@gc-erp/mcp-server",
+    "lint": "turbo run lint",
+    "format": "biome check --write --unsafe .",
     "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "gate": "turbo run lint typecheck test",
     "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.10",
+    "@commitlint/cli": "20.5.0",
+    "@commitlint/config-conventional": "20.5.0",
+    "@commitlint/types": "20.5.0",
+    "lefthook": "2.1.5",
     "turbo": "^2.0.0"
   }
 }

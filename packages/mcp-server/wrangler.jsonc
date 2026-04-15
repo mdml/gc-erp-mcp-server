@@ -8,11 +8,7 @@
     "enabled": true
   },
   "durable_objects": {
-    "bindings": [
-      { "name": "MCP_OBJECT", "class_name": "GcErpMcp" }
-    ]
+    "bindings": [{ "name": "MCP_OBJECT", "class_name": "GcErpMcp" }]
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["GcErpMcp"] }
-  ]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GcErpMcp"] }]
 }

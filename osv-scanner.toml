@@ -1,0 +1,9 @@
+# OSV Scanner configuration
+# See: https://google.github.io/osv-scanner/configuration/
+#
+# Ignored vulns require both a reason and an ignoreUntil expiry.
+#
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-yyyy-zzzz"
+# ignoreUntil = "2026-07-01T00:00:00Z"
+# reason = "No fix available; mitigated by ..."
