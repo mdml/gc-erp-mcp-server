@@ -9,8 +9,10 @@ node_modules/
 .envrc.enc
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 .env
 .env.*
+!.env.example
 
 # Build artifacts
 dist/
