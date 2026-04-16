@@ -1,0 +1,14 @@
+# Files to copy from the main checkout into a `claude --worktree` worktree.
+# Gitignore syntax; only matched-AND-gitignored files are copied.
+# Docs: https://code.claude.com/docs/en/common-workflows#copy-gitignored-files-to-worktrees
+
+# Encrypted team/dev env body. Re-rendering requires an active 1Password session,
+# so copying it in is what makes `claude --worktree` work without manual setup.
+.envrc.enc
+
+# Wrangler local dev vars (matches packages/mcp-server/.dev.vars via gitignore semantics).
+.dev.vars
+
+# Personal 1Password refs — lets a dev optionally `eval $(op signin) && bun run sync-secrets`
+# inside the worktree to refresh secrets without hand-copying refs.
+.env.op.local
