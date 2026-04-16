@@ -93,7 +93,7 @@ Turbo-managed bun workspace. Two packages at v1:
 
 A single HTTP request from a client:
 
-1. **Edge entry.** Cloudflare routes the request to our Worker at `https://gc-erp-mcp-server.<account>.workers.dev`.
+1. **Edge entry.** Cloudflare routes the request to our Worker at `https://gc.leiserson.me` (attached via the `custom_domain: true` route in `wrangler.jsonc`; the `*.workers.dev` fallback is disabled).
 2. **Fetch handler** (`packages/mcp-server/src/index.ts`):
    - `GET /` → plaintext banner, 200. Used as a trivial liveness check; no auth.
    - `GET|POST /mcp*` → bearer check via `timingSafeEqual` against `env.MCP_BEARER_TOKEN`. Missing or wrong token → `401 unauthorized` with `WWW-Authenticate: Bearer realm="gc-erp"`.
@@ -155,6 +155,7 @@ Three layers, each with a different lifecycle and a different failure mode.
 - **`wrangler login` is deliberately avoided.** It writes a user-wide OAuth token at `~/.wrangler/config/default.toml` that would then be picked up by every Cloudflare-touching repo on the machine. Max works in multiple GitHub orgs — per-project env-var auth keeps projects isolated.
 - **`.dev.vars` is separate from the shell env.** Wrangler reads `.dev.vars` into the *Worker's* runtime environment during `wrangler dev`; those bindings don't touch the shell. `sync-secrets` writes both artifacts from the same 1Password lookup.
 - **The deployed Worker's bearer is uploaded out-of-band.** `wrangler secret put MCP_BEARER_TOKEN` is a one-time step per rotation — deliberately not automated in v1 because rotating production should be a conscious act.
+- **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `OP_SERVICE_ACCOUNT_TOKEN` variables above only reach their child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — the values don't get hashed into the task cache key. Without the declaration, wrangler sees no auth and silently falls back to OAuth — a class of bug the env-var auth pattern is meant to prevent, so the passthrough list is part of the secrets architecture, not a build-system detail.
 
 Files on disk, at rest:
 
@@ -175,18 +176,19 @@ Files on disk, at rest:
 ```
 developer shell (env vars loaded via direnv)
        │
-       │  turbo run deploy
+       │  turbo run deploy   ← globalPassThroughEnv forwards the auth vars
        ▼
-wrangler → reads wrangler.jsonc
+wrangler → reads wrangler.jsonc (account_id pin refuses non-matching CLOUDFLARE_ACCOUNT_ID)
            uploads Worker script (src/index.ts, compiled)
            applies DO migrations (GcErpMcp SQLite class)
-           routes *.workers.dev/mcp → the Worker
+           attaches custom domain  gc.leiserson.me  (routes custom_domain:true)
 ```
 
-- **One environment.** v1 has no staging. The `*.workers.dev` URL is production-but-dogfood; a rotation of `MCP_BEARER_TOKEN` + re-upload is enough to revoke access if the bearer leaks.
+- **One environment.** v1 has no staging. The canonical URL is `https://gc.leiserson.me`; `*.workers.dev` and preview URLs are explicitly disabled in `wrangler.jsonc` (`workers_dev: false`, `preview_urls: false`) so the auth surface is a single hostname. A rotation of `MCP_BEARER_TOKEN` + re-upload is enough to revoke access if the bearer leaks.
+- **Account pin.** `packages/mcp-server/wrangler.jsonc` declares `account_id` for the personal Cloudflare org that owns `leiserson.me`. Wrangler refuses to deploy if `CLOUDFLARE_ACCOUNT_ID` disagrees, turning cross-account mis-routes (e.g. a stale value in 1Password pointing at a different org) into a loud failure instead of a silent wrong-account deploy.
 - **Durable Object migrations** are declared in `wrangler.jsonc` under `migrations`. Each migration gets a tag (`v1`, `v2`, …). Adding SQL state later is a new migration, not a rewrite.
 - **Compatibility date** is pinned (`2026-04-15` at v1). Worker APIs evolve; pinning ensures old deploys don't start behaving differently after a platform update.
-- **Account-level provisioning** (custom domain; later D1, R2, Worker secrets) lives in [`packages/infra/`](../../packages/infra/) as a declarative manifest + per-command entry scripts — `bun run infra:{status,apply,teardown}`. `wrangler deploy` stays in charge of the Worker script and DO migrations; the infra CLI handles everything *around* the Worker. See [ADR 0002](../decisions/0002-infra-cli.md).
+- **Account-level provisioning** (custom domain status + teardown; later D1, R2, Worker secrets) lives in [`packages/infra/`](../../packages/infra/) as a declarative manifest + per-command entry scripts — `bun run infra:{status,apply,teardown}`. `wrangler deploy` stays in charge of the Worker script, DO migrations, and the custom-domain *attach*; the infra CLI handles status, teardown, and the resources around the Worker that wrangler doesn't manage. See [ADR 0002](../decisions/0002-infra-cli.md).
 
 ---
 

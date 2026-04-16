@@ -87,26 +87,25 @@ curl -s -X POST http://localhost:8787/mcp \
 
 ## Deploy
 
-Wrangler picks up `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from the env — no `wrangler login`, so this repo stays isolated from other Cloudflare-using repos on the same machine.
+Wrangler picks up `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from the env — no `wrangler login`, so this repo stays isolated from other Cloudflare-using repos on the same machine. `packages/mcp-server/wrangler.jsonc` also pins `account_id`, so a wrong `CLOUDFLARE_ACCOUNT_ID` fails loudly instead of cross-deploying.
 
 ```bash
 turbo run deploy
 ```
 
-Returns a URL like `https://gc-erp-mcp-server.<account>.workers.dev`. The MCP path is `/mcp`.
+Serves at `https://gc.leiserson.me`; the MCP path is `/mcp`. The `*.workers.dev` fallback is disabled in `wrangler.jsonc` so there's a single canonical hostname.
 
 **One-time per environment**: the bearer value lives in 1Password and needs to be uploaded as a Cloudflare secret so the deployed Worker can authenticate requests. Do this once (and whenever the bearer rotates):
 
 ```bash
-cd packages/mcp-server
-echo -n "$MCP_BEARER_TOKEN" | npx wrangler secret put MCP_BEARER_TOKEN
+(cd packages/mcp-server && op read "op://gc-erp/mcp-bearer/credential" | bunx wrangler secret put MCP_BEARER_TOKEN)
 ```
 
-(This is the intentional out-of-band step — not automated in v1.)
+Piping direct from `op read` keeps the value out of shell history and off disk. This is the intentional out-of-band step — not automated in v1.
 
 ## Connect from a client
 
-Add a custom connector / remote MCP server pointing at `https://…workers.dev/mcp`, with `Authorization: Bearer <token>` as the auth header. Exact steps depend on the client (Claude Desktop, Claude web, Claude mobile). Once connected, `ping` and `list_jobs` show up in the tool list.
+Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`, with `Authorization: Bearer <token>` as the auth header. Exact steps depend on the client (Claude Desktop, Claude web, Claude mobile). Once connected, `ping` and `list_jobs` show up in the tool list.
 
 ## Scripts (root)
 
