@@ -8,6 +8,13 @@ pre-commit:
       run: turbo run lint
     typecheck:
       run: turbo run typecheck
+    code-health:
+      # CLI owns the semantics — hard-fails on missing cs, missing
+      # CS_ACCESS_TOKEN, unmeasured runs, or any score < 10.
+      # See packages/dev-tools/src/code-health.ts.
+      glob: "*.{ts,tsx,js,jsx,mjs}"
+      exclude: '*.{test,spec}.{ts,tsx,js,jsx,mjs}'
+      run: bun run code-health {staged_files}
 
 commit-msg:
   commands:
@@ -16,7 +23,7 @@ commit-msg:
 
 pre-push:
   commands:
-    full-gate:
-      run: bun run gate
+    gate:
+      run: bun run gate -- --coverage
     osv-scan:
       run: osv-scanner scan --config=osv-scanner.toml --lockfile=bun.lock

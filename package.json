@@ -14,7 +14,9 @@
     "format": "biome check --write --unsafe .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "gate": "turbo run lint typecheck test",
+    "test:coverage": "turbo run test:coverage",
+    "gate": "bun run --cwd packages/dev-tools gate",
+    "code-health": "bun run --cwd packages/dev-tools code-health",
     "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools"
   },
   "devDependencies": {

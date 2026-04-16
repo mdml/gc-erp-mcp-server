@@ -15,7 +15,13 @@
     },
     "lint": {},
     "typecheck": {},
-    "test": {},
+    "test": {
+      "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"]
+    },
+    "test:coverage": {
+      "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"],
+      "outputs": ["coverage/**"]
+    },
     "sync-secrets": {
       "cache": false
     }
