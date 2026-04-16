@@ -1,14 +1,23 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "gc-erp-mcp-server",
+  // Personal Cloudflare account (Mdml@pm.me). Pinned so wrangler refuses to
+  // deploy if CLOUDFLARE_ACCOUNT_ID ever points at a different org — this
+  // guardrail complements the env-var auth flow (see docs/guides/ARCHITECTURE.md §4).
+  "account_id": "9580b3080d50ddd43e866bf38646d318",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-15",
   "compatibility_flags": ["nodejs_compat"],
+  // Disable the *.workers.dev fallback and preview URLs — the Worker is only
+  // reachable via gc.leiserson.me, keeping the auth surface to one hostname.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": {
     "enabled": true
   },
   "durable_objects": {
     "bindings": [{ "name": "MCP_OBJECT", "class_name": "GcErpMcp" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GcErpMcp"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GcErpMcp"] }],
+  "routes": [{ "pattern": "gc.leiserson.me", "custom_domain": true }]
 }
