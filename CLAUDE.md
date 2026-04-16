@@ -54,7 +54,7 @@ Secrets are encrypted at rest per-developer via age (see [docs/guides/ARCHITECTU
 ### Testing
 
 - Tests live next to source: `foo.ts` → `foo.test.ts`.
-- Coverage thresholds (v1): `lines: 80` overall, `lines: 60` per file. Enforced per-package in `vitest.config.ts`.
+- Coverage thresholds: `lines: 90` overall, `lines: 70` per file. Enforced per-package in `vitest.config.ts`.
 - **Mock boundaries, not collaborators.** If a function fundamentally shells out (`Bun.spawn`, `fetch`), exclude it from coverage rather than mocking `Bun.spawn` to force a number.
 - Never invoke test runners directly (`vitest run`, `playwright test`) — always go through `bun run test` so env + resolution are consistent.
 

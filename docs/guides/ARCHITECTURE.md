@@ -70,7 +70,7 @@ Turbo-managed bun workspace. Two packages at v1:
     ├── mcp-server/                  # the Cloudflare Worker — runtime
     │   ├── src/index.ts             #   fetch handler + GcErpMcp class + timingSafeEqual
     │   ├── src/*.test.ts            #   vitest suites
-    │   ├── vitest.config.ts         #   coverage thresholds: 80 overall / 60 per file
+    │   ├── vitest.config.ts         #   coverage thresholds: 90 overall / 70 per file
     │   ├── wrangler.jsonc           #   Worker + DO binding + migration
     │   └── .dev.vars.example
     └── dev-tools/                   # internal CLIs — never bundled into the runtime
@@ -213,11 +213,21 @@ Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`
 | full gate       | `bun run gate -- --coverage`                                | typecheck + lint + test w/ coverage + cs        |
 | vulnerability   | `osv-scanner scan --config ... --lockfile=bun.lock`         | catch known CVEs in dependencies                |
 
-`bun run gate` dispatches to `packages/dev-tools/src/gate/` which runs each check as a subprocess, collects results, and prints a pass/fail summary. Coverage thresholds are `lines: 80` overall / `lines: 60` per file, configured in each package's `vitest.config.ts`.
+`bun run gate` dispatches to `packages/dev-tools/src/gate/` which runs each check as a subprocess, collects results, and prints a pass/fail summary. Coverage thresholds are `lines: 90` overall / `lines: 70` per file, configured in each package's `vitest.config.ts`.
+
+### CI (GitHub Actions)
+
+| Check       | Mechanism                              | Purpose                                        |
+|-------------|----------------------------------------|------------------------------------------------|
+| lint        | `bun run lint`                         | server-side repeat of the pre-commit gate      |
+| typecheck   | `bun run typecheck`                    | server-side repeat of the pre-commit gate      |
+| tests + cov | `bun run test:coverage`                | enforce thresholds on PRs and main             |
+
+Defined in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). CodeScene and OSV intentionally stay local-only: CodeScene needs `CS_ACCESS_TOKEN` (no secret management for dogfood), and both are already enforced on pre-push.
 
 ### Why this ladder
 
-Fast local checks fail loudly at the moment of authorship. Expensive checks move to pre-push so that each commit stays cheap. Nothing runs in CI yet — v1 is dogfood-only; CI enters when we open up beyond me + Salman.
+Fast local checks fail loudly at the moment of authorship. Expensive checks move to pre-push so that each commit stays cheap. CI is the backstop — it reruns the same free checks (lint + typecheck + tests w/ coverage) server-side so a broken branch can't reach `main` if someone bypasses hooks. Secret-gated checks (CodeScene, OSV) stay local.
 
 ---
 

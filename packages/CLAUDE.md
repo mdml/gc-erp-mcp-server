@@ -15,7 +15,7 @@ When creating a new package:
    - `format`: `biome check --write --unsafe .`
    - `typecheck`: `tsc --noEmit`
 2. **`tsconfig.json`** — extend the project's base settings (ES2022, strict, bundler resolution).
-3. **`vitest.config.ts`** — v8 coverage provider; include `src/**/*.ts`; exclude test files and thin I/O wiring (see below). Thresholds follow the project standard (currently `lines: 80` / per-file `lines: 60`; see [backlog](../docs/product/backlog.md) for when these tighten).
+3. **`vitest.config.ts`** — v8 coverage provider; include `src/**/*.ts`; exclude test files and thin I/O wiring (see below). Thresholds follow the project standard (`lines: 90` / per-file `lines: 70`).
 4. **Devdeps** — `vitest` and `@vitest/coverage-v8` at exactly the same pinned version as other packages (`bunfig.toml` `exact = true`).
 5. **Tests next to source** — `foo.ts` gets `foo.test.ts` in the same directory.
 6. **`CLAUDE.md`** — what this package does, key files, testing approach, any package-specific invariants. Keep it short; link to ARCHITECTURE.md for cross-cutting details.
