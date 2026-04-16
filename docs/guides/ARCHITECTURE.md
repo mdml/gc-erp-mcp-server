@@ -73,11 +73,16 @@ Turbo-managed bun workspace. Two packages at v1:
     │   ├── vitest.config.ts         #   coverage thresholds: 90 overall / 70 per file
     │   ├── wrangler.jsonc           #   Worker + DO binding + migration
     │   └── .dev.vars.example
-    └── dev-tools/                   # internal CLIs — never bundled into the runtime
-        ├── src/sync-secrets.ts      #   1Password → age → .envrc.enc + .dev.vars
-        ├── src/secrets.config.ts    #   declarative list of required secrets
-        ├── src/gate/                #   gate runner (typecheck, lint, test, code health)
-        └── src/*.test.ts
+    ├── dev-tools/                   # internal CLIs for LOCAL dev — never bundled into the runtime
+    │   ├── src/sync-secrets.ts      #   1Password → age → .envrc.enc + .dev.vars
+    │   ├── src/secrets.config.ts    #   declarative list of required secrets
+    │   ├── src/gate/                #   gate runner (typecheck, lint, test, code health)
+    │   └── src/*.test.ts
+    └── infra/                       # internal CLI for REMOTE Cloudflare state — never bundled
+        ├── src/infra.config.ts      #   declarative desired state (worker, custom domain, …)
+        ├── src/lib/                 #   sole boundary: cloudflare-client (fetch), wrangler-adapter (Bun.spawn)
+        ├── src/providers/           #   one file per resource kind (custom-domain now; D1/R2 next)
+        └── src/{status,apply,teardown}.ts  # command entries (bun run infra:status etc.)
 ```
 
 **Why this split.** `mcp-server` is code shipped to production; `dev-tools` is machinery that makes the monorepo habitable. Keeping them separate means `mcp-server`'s bundle stays small and its deps stay relevant to what's actually deployed.
@@ -181,6 +186,7 @@ wrangler → reads wrangler.jsonc
 - **One environment.** v1 has no staging. The `*.workers.dev` URL is production-but-dogfood; a rotation of `MCP_BEARER_TOKEN` + re-upload is enough to revoke access if the bearer leaks.
 - **Durable Object migrations** are declared in `wrangler.jsonc` under `migrations`. Each migration gets a tag (`v1`, `v2`, …). Adding SQL state later is a new migration, not a rewrite.
 - **Compatibility date** is pinned (`2026-04-15` at v1). Worker APIs evolve; pinning ensures old deploys don't start behaving differently after a platform update.
+- **Account-level provisioning** (custom domain; later D1, R2, Worker secrets) lives in [`packages/infra/`](../../packages/infra/) as a declarative manifest + per-command entry scripts — `bun run infra:{status,apply,teardown}`. `wrangler deploy` stays in charge of the Worker script and DO migrations; the infra CLI handles everything *around* the Worker. See [ADR 0002](../decisions/0002-infra-cli.md).
 
 ---
 

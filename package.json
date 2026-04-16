@@ -18,7 +18,10 @@
     "gate": "bun run --cwd packages/dev-tools gate",
     "code-health": "bun run --cwd packages/dev-tools code-health",
     "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools",
-    "install-agent-config": "turbo run install-agent-config --filter=@gc-erp/agent-config"
+    "install-agent-config": "turbo run install-agent-config --filter=@gc-erp/agent-config",
+    "infra:status": "bun run --cwd packages/infra infra:status",
+    "infra:apply": "bun run --cwd packages/infra infra:apply",
+    "infra:teardown": "bun run --cwd packages/infra infra:teardown"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",

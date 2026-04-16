@@ -11,7 +11,8 @@ For the product pitch → [docs/product/overview.md](docs/product/overview.md). 
 ## Repo shape
 
 - `packages/mcp-server/` — Cloudflare Worker (the runtime; ships to production)
-- `packages/dev-tools/` — internal CLIs (gate runner, sync-secrets); never shipped
+- `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, sync-secrets); never shipped
+- `packages/infra/` — internal CLI for *remote* Cloudflare provisioning (custom domain, [later] D1/R2/secrets); never shipped
 - `packages/agent-config/` — single source of truth for Claude Code permissions; installs `.claude/settings.json` via `bun install`
 
 Each package has its own `CLAUDE.md` with scope-specific instructions. Read the relevant one before touching a file in that package.
@@ -128,4 +129,5 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 - **"I want to change a tool's response."** → [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
 - **"I want to add a new secret."** → [packages/dev-tools/CLAUDE.md](packages/dev-tools/CLAUDE.md) → `src/secrets.config.ts`.
 - **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.
+- **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/CLAUDE.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.
 - **"I want to make an architectural decision."** → [docs/decisions/CLAUDE.md](docs/decisions/CLAUDE.md) → copy `0000-template.md`.
