@@ -27,3 +27,12 @@ pre-push:
       run: bun run gate -- --coverage
     osv-scan:
       run: osv-scanner scan --config=osv-scanner.toml --lockfile=bun.lock
+
+post-checkout:
+  # Fires after `git worktree add`, `git clone`, and branch switches.
+  # Bootstrap is idempotent: `bun install` is a no-op if the lockfile is
+  # satisfied, and sync-secrets is gated on `.envrc.enc` missing, so plain
+  # branch flips don't pay the 1Password round-trip.
+  commands:
+    bootstrap:
+      run: bun run --cwd packages/agent-config bootstrap {1} {2} {3}

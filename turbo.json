@@ -24,6 +24,9 @@
     },
     "sync-secrets": {
       "cache": false
+    },
+    "install-agent-config": {
+      "cache": false
     }
   }
 }

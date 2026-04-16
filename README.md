@@ -17,6 +17,7 @@ Turbo monorepo:
 
 - `packages/mcp-server/` — the Cloudflare Worker (MCP server). Runtime code.
 - `packages/dev-tools/` — Bun-based internal tools. Currently ships `sync-secrets`.
+- `packages/agent-config/` — single source of truth for Claude Code permissions. Writes `.claude/settings.json` on every `bun install` (see [its CLAUDE.md](packages/agent-config/CLAUDE.md) to change the policy).
 
 Secrets come from 1Password in two flavors:
 
@@ -122,11 +123,12 @@ Add a custom connector / remote MCP server pointing at `https://…workers.dev/m
 
 ## Quality gates
 
-`bun install` runs `lefthook install` via the `prepare` script, which wires three git hooks:
+`bun install` runs `lefthook install` **and** `install-agent-config` via the `prepare` script. That wires four git hooks and regenerates `.claude/settings.json` from `packages/agent-config`:
 
 - **pre-commit** — `turbo run lint`, `turbo run typecheck`, and `cs check` over staged source files (`.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`, minus `*.test.*`/`*.spec.*`). Biome handles both lint and format from `biome.json`; run `bun run format` to auto-fix anything Biome flags.
 - **commit-msg** — `commitlint` enforces [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `chore:`, …). Allowed types are the standard set; no research-specific extensions.
 - **pre-push** — runs `bun run gate -- --coverage` (lint + typecheck + test-with-coverage + Code Health over branch-changed files) and then `osv-scanner` against `bun.lock` for known vulnerabilities.
+- **post-checkout** — `packages/agent-config/bootstrap` runs `bun install`, re-installs `.claude/settings.json`, and (when `.envrc.enc` is missing) runs `turbo run sync-secrets`. This makes `git worktree add …` a one-step setup; if `op` isn't signed in when a fresh worktree lands, the hook hard-fails so the half-set-up state is visible.
 - **Code Health (CodeScene)**: every changed source file must score ≥ 10.0. Requires the `cs` CLI (`npm i -g @codescene/codescene-cli`) and a valid `CS_ACCESS_TOKEN` — a per-developer secret (add its 1Password ref to `.env.op.local` and re-run `turbo run sync-secrets`). A missing CLI, unset token, or auth/connection failure hard-fails both the pre-commit hook and the pre-push gate. Contributing to this repo requires a CodeScene seat.
 - **Test coverage**: vitest enforces `lines: 80` (overall) and `lines: 60` (per-file glob) per package. Exclusions live in each package's `vitest.config.ts` — subprocess orchestrators and thin CLI entries are excluded rather than mocked.
 

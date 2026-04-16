@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "prepare": "lefthook install",
+    "prepare": "lefthook install && bun run --cwd packages/agent-config install-agent-config",
     "dev": "turbo run dev --filter=@gc-erp/mcp-server",
     "deploy": "turbo run deploy --filter=@gc-erp/mcp-server",
     "tail": "turbo run tail --filter=@gc-erp/mcp-server",
@@ -17,7 +17,8 @@
     "test:coverage": "turbo run test:coverage",
     "gate": "bun run --cwd packages/dev-tools gate",
     "code-health": "bun run --cwd packages/dev-tools code-health",
-    "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools"
+    "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools",
+    "install-agent-config": "turbo run install-agent-config --filter=@gc-erp/agent-config"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",
