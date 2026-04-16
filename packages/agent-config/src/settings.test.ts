@@ -65,6 +65,14 @@ describe("composeSettings", () => {
     expect(s.permissions.allow).not.toContain("Bash(git push *)");
   });
 
+  it("denies bun-run surfaces for production ops", () => {
+    const s = composeSettings();
+    expect(s.permissions.allow).toContain("Bash(bun run *)");
+    expect(s.permissions.deny).toContain("Bash(bun run deploy*)");
+    expect(s.permissions.deny).toContain("Bash(bun run infra:apply*)");
+    expect(s.permissions.deny).toContain("Bash(bun run infra:teardown*)");
+  });
+
   it("denies direct op/age usage", () => {
     const s = composeSettings();
     expect(s.permissions.deny).toContain("Bash(op read*)");

@@ -22,6 +22,15 @@ Source of truth for the team-wide Claude Code policy. Owns `.claude/settings.jso
 - **Enabling an MCP server** → edit `src/policy/mcp.ts`.
 - **Editing worktree bootstrap steps** → edit `src/bootstrap.ts`. Keep it thin — hard-fail on any unexpected error so a broken worktree doesn't sit in a half-set-up state.
 
+## Pattern semantics (gotchas)
+
+- **Match is on the literal command string**, not the resolved target. `Bash(turbo run deploy*)` does NOT catch `bun run deploy`, even though `bun run deploy` resolves to `turbo run deploy …`. Each invocation surface (bun, turbo, wrangler) needs its own deny if the underlying action is dangerous.
+- **`*` globs match any suffix, including flags and extra args.** `Bash(bun run *)` covers `bun run test`, `bun run --cwd packages/foo test`, `bun run --filter @gc-erp/mcp-server test`, and `bun run test -- --reporter=verbose` alike.
+- **DENY beats ALLOW.** So the safe broadening pattern is: widen the allow glob, then add an explicit deny for any dangerous script name the glob now covers.
+- **Feature-branch pushes are enumerated, not globbed.** `git push origin <prefix>/*` auto-allows for each conventional-commit prefix (`slice`, `feat`, `fix`, …); bare `git push` stays ASK so `main` pushes never skip the prompt.
+
+For the user-facing cheat sheet of command shapes that auto-allow, see [root CLAUDE.md § Agent auto-allow](../../CLAUDE.md#agent-auto-allow--command-shapes).
+
 ## Invariants
 
 - **`.claude/` is a build output.** Never hand-edit `.claude/settings.json`; regenerate from this package. There is no `settings.local.json` escape hatch — if you need a new permission, send a PR.

@@ -33,6 +33,28 @@ turbo run deploy                # deploy Worker to Cloudflare
 
 Secrets are encrypted at rest per-developer via age (see [docs/guides/ARCHITECTURE.md §4](docs/guides/ARCHITECTURE.md)). Prereqs: `age`, `direnv`, `op` (1Password CLI), `bun`, `lefthook`, `osv-scanner`. `cs` (CodeScene CLI) is optional — if missing, the code-health gate warns loudly but passes.
 
+### Agent auto-allow — command shapes
+
+These forms run without a permission prompt (policy lives in [packages/agent-config/src/policy/](packages/agent-config/src/policy/)):
+
+| Shape | Example | Notes |
+|---|---|---|
+| `bun install …` | `bun install`, `bun install --frozen-lockfile` | |
+| `bun run <anything>` | `bun run gate`, `bun run test`, `bun run --cwd packages/mcp-server test`, `bun run --filter @gc-erp/mcp-server test` | Broad glob. Flag position doesn't matter — `--cwd`, `--filter`, and extra args all match. |
+| `bunx <tool> …` | `bunx biome check .`, `bunx vitest run`, `bunx tsc --noEmit`, `bunx turbo run test` | Limited to the tools enumerated in `allow.ts` (biome, vitest, commitlint, tsc, turbo). |
+| `turbo run <task> …` | `turbo run test --filter=@gc-erp/mcp-server`, `turbo run typecheck` | Works for every task except `deploy` (denied). |
+| `git push origin <prefix>/*` | `git push origin slice/3-infra`, `git push -u origin feat/foo` | Conventional-commit prefixes only. Bare `git push` and pushes to `main` stay ASK. |
+| `gh pr view/create/comment/edit/ready` | `gh pr create --title …`, `gh pr view 42` | Full list in `allow.ts`. |
+
+What **never** auto-runs (by deny):
+
+- `bun run deploy`, `bun run infra:apply`, `bun run infra:teardown` — production surfaces.
+- `turbo run deploy`, `wrangler deploy`, `wrangler secret …`, `wrangler login`.
+- `git push --force` (any variant), `git reset --hard`, `git branch -D`, `rm -rf …`.
+- Secret readers: `cat .envrc.enc`, `cat .dev.vars`, `printenv`, `env`, `op read`, `age -d`, `gh auth token`.
+
+To change what auto-allows or denies, edit [packages/agent-config/src/policy/](packages/agent-config/src/policy/) — never hand-edit `.claude/settings.json` (it's a regenerated build output). See [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md).
+
 ## Invariants
 
 ### Architecture

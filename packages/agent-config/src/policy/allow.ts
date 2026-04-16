@@ -74,15 +74,10 @@ export const bashAllow: readonly string[] = [
   ...featurePushPatterns,
 
   // Monorepo tooling — bun scripts wired in package.json.
+  // Individual scripts aren't enumerated; `bun run *` is broad by design and
+  // the deny list holds the floor (prod deploys, infra apply/teardown).
   "Bash(bun install*)",
-  "Bash(bun run test*)",
-  "Bash(bun run typecheck*)",
-  "Bash(bun run lint*)",
-  "Bash(bun run format*)",
-  "Bash(bun run gate*)",
-  "Bash(bun run code-health*)",
-  "Bash(bun run install-agent-config*)",
-  "Bash(bun run bootstrap*)",
+  "Bash(bun run *)",
   "Bash(bunx biome*)",
   "Bash(bunx vitest*)",
   "Bash(bunx commitlint*)",

@@ -61,11 +61,17 @@ export const bashDeny: readonly string[] = [
   "Bash(gh auth status --show-token*)",
 
   // Production ops — deploys and prod secret writes.
+  // Pattern matching is on the literal command string, so `bun run deploy`
+  // (which resolves to `turbo run deploy …`) is NOT caught by the turbo entry
+  // — each invocation surface needs its own deny.
   "Bash(wrangler login*)",
   "Bash(wrangler logout*)",
   "Bash(wrangler secret*)",
   "Bash(wrangler deploy*)",
   "Bash(turbo run deploy*)",
+  "Bash(bun run deploy*)",
+  "Bash(bun run infra:apply*)",
+  "Bash(bun run infra:teardown*)",
 
   // Publishes.
   "Bash(npm publish*)",
