@@ -6,7 +6,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { z } from "zod";
 import { activities } from "./activities";
-import { Duration, Money } from "./common";
+import { Duration, IsoDay, Money } from "./common";
 import {
   ActivationId,
   ActivityId,
@@ -69,10 +69,7 @@ export const Commitment = z.object({
   counterpartyId: PartyId,
   price: PriceKind,
   activations: z.array(Activation).min(1),
-  signedOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+  signedOn: IsoDay.optional(),
 });
 export type Commitment = z.infer<typeof Commitment>;
 
