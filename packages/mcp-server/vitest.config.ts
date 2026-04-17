@@ -12,6 +12,9 @@ export default defineConfig({
         // workerd. Pure logic (auth, handler) is extracted so this file has no
         // testable branches left.
         "src/index.ts",
+        // Thin test harness: in-memory sqlite factory used by tool tests. No
+        // testable branches — swapping it for mocks would defeat the point.
+        "src/tools/_test-db.ts",
       ],
       reporter: ["text", "text-summary", "json-summary"],
       reportsDirectory: "./coverage",

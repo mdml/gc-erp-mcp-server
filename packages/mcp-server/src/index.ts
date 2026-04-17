@@ -1,10 +1,13 @@
+import { createDatabaseClient } from "@gc-erp/database";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { makeFetchHandler } from "./handler";
+import { createJob, ensureActivity, listJobs, registerToolOn } from "./tools";
 
 interface Env {
   MCP_BEARER_TOKEN: string;
   MCP_OBJECT: DurableObjectNamespace;
+  DB: D1Database;
 }
 
 export class GcErpMcp extends McpAgent<Env> {
@@ -13,7 +16,7 @@ export class GcErpMcp extends McpAgent<Env> {
     version: "0.0.1",
   });
 
-  /* v8 ignore start -- TODO(coverage): test tools via in-memory MCP server */
+  /* v8 ignore start -- workerd-only wiring; tool logic is covered via pure handler tests */
   async init(): Promise<void> {
     this.server.registerTool(
       "ping",
@@ -31,21 +34,10 @@ export class GcErpMcp extends McpAgent<Env> {
       }),
     );
 
-    this.server.registerTool(
-      "list_jobs",
-      {
-        description:
-          "List all jobs across all projects. Returns an empty array until persistence is wired up.",
-      },
-      async () => ({
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify([], null, 2),
-          },
-        ],
-      }),
-    );
+    const db = () => createDatabaseClient(this.env.DB);
+    registerToolOn(this.server, createJob, db);
+    registerToolOn(this.server, listJobs, db);
+    registerToolOn(this.server, ensureActivity, db);
   }
   /* v8 ignore stop */
 }

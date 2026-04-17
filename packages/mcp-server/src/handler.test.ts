@@ -4,12 +4,14 @@ import { type McpFetcher, makeFetchHandler } from "./handler";
 interface TestEnv {
   MCP_BEARER_TOKEN: string;
   MCP_OBJECT: DurableObjectNamespace;
+  DB: D1Database;
 }
 
 function makeEnv(token = "super-secret"): TestEnv {
   return {
     MCP_BEARER_TOKEN: token,
     MCP_OBJECT: {} as unknown as DurableObjectNamespace,
+    DB: {} as unknown as D1Database,
   };
 }
 
