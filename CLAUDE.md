@@ -20,7 +20,7 @@ Each package has its own `CLAUDE.md` with scope-specific instructions. Read the 
 ## Development
 
 ```bash
-bun install                     # workspaces resolve; lefthook hooks install via `prepare`
+bun install                     # workspaces resolve; in main, `prepare` installs lefthook hooks (skipped in worktrees — they share main's hooks)
 turbo run sync-secrets          # pulls secrets from 1Password → .envrc.enc + .dev.vars
 direnv allow                    # one-time; direnv auto-loads env on cd thereafter
 turbo run dev                   # wrangler dev for the Worker
