@@ -45,6 +45,11 @@ export const bashAllow: readonly string[] = [
   "Bash(which *)",
   "Bash(pwd)",
 
+  // Filesystem writes — scaffolding new package dirs during a session.
+  // Reversible (empty dirs) and low-radius. `rm -rf` / `rm -r` stay deny.
+  "Bash(mkdir -p *)",
+  "Bash(mkdir *)",
+
   // Git inspection (read-only).
   "Bash(git status*)",
   "Bash(git diff*)",
@@ -61,6 +66,11 @@ export const bashAllow: readonly string[] = [
   "Bash(git config --get *)",
   "Bash(git stash list*)",
 
+  // Git ref fetch (no working-tree or local-branch mutation — just updates
+  // remote-tracking refs). Needed at session start to compare against
+  // origin before picking a base-ref alignment strategy.
+  "Bash(git fetch*)",
+
   // Git local writes covered by branch protection + human review at push/merge.
   "Bash(git add *)",
   "Bash(git commit -m *)",
@@ -70,6 +80,11 @@ export const bashAllow: readonly string[] = [
   "Bash(git stash*)",
   "Bash(git restore --staged *)",
 
+  // Fast-forward-only merge — refuses if non-FF, so it can't discard local
+  // commits. This is the safe alternative to `git reset --hard origin/<branch>`
+  // for base-ref alignment in fresh worktrees. `git reset --hard` stays deny.
+  "Bash(git merge --ff-only*)",
+
   // Pushes to feature branches only (force variants live in deny).
   ...featurePushPatterns,
 
@@ -78,6 +93,12 @@ export const bashAllow: readonly string[] = [
   // the deny list holds the floor (prod deploys, infra apply/teardown).
   "Bash(bun install*)",
   "Bash(bun run *)",
+  // `bun pm` surfaces are registry + local-graph introspection — read-only.
+  // `view` hits the npm registry for version/time metadata; `ls` and `why`
+  // walk the local install graph. None of these mutate bun.lock.
+  "Bash(bun pm view*)",
+  "Bash(bun pm ls*)",
+  "Bash(bun pm why*)",
   "Bash(bunx biome*)",
   "Bash(bunx vitest*)",
   "Bash(bunx commitlint*)",
