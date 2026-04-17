@@ -28,7 +28,11 @@ export const CommitmentEdit = z.discriminatedUnion("op", [
     op: z.literal("setActivation"),
     commitmentId: CommitmentId,
     activationId: ActivationId,
-    fields: Activation.partial(),
+    // `id` is omitted — the activation being patched is named by
+    // `activationId`; letting callers pass a different `id` in `fields`
+    // would either be a no-op or silently rename the row. SPEC says
+    // `Activation.partial()`; we tighten to make the no-op unrepresentable.
+    fields: Activation.omit({ id: true }).partial(),
   }),
   z.object({
     op: z.literal("removeActivation"),
