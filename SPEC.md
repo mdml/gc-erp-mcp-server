@@ -294,10 +294,10 @@ Kitchen                         (root scope)
 ├── Plumbing rough-in
 ├── Drywall & finish
 ├── Cabinets
-│   └── spec.materials: [ { sku: "IKEA-BODBYN-W-30", qty: 4 }, ... ]
+│   └── spec.materials: [ { sku: "IKEA-BODBYN-W-30", description: "BODBYN white 30\" wall cabinet", quantity: 4 }, ... ]
 │   └── spec.installNotes: "Soft-close, level to countertop template"
 ├── Countertops
-│   └── spec.materials: [ { sku: "CAMBRIA-BRITANNICA-3CM", qty: 42, unit: "sqft" } ]
+│   └── spec.materials: [ { sku: "CAMBRIA-BRITANNICA-3CM", description: "Cambria Britannica quartz 3cm slab", quantity: 42, unit: "sqft" } ]
 ├── Appliances
 ├── Backsplash
 ├── Paint
