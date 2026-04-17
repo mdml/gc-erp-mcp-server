@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:seed:activities": "bun run src/seed/run.ts activities"
+    "db:seed:activities": "bun run src/seed/run.ts activities",
+    "db:seed:kitchen-fixture": "bun run src/seed/run.ts kitchen-fixture"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
