@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { makeFetchHandler } from "./handler";
 import {
+  applyPatch,
   createJob,
   createParty,
   createProject,
@@ -53,6 +54,7 @@ export class GcErpMcp extends McpAgent<Env> {
     registerToolOn(this.server, listJobs, db);
     registerToolOn(this.server, listScopes, db);
     registerToolOn(this.server, ensureActivity, db);
+    registerToolOn(this.server, applyPatch, db);
   }
   /* v8 ignore stop */
 }

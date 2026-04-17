@@ -1,6 +1,7 @@
 /** Barrel for tool modules + the shared wiring primitives. */
 
 export * from "./_mcp-tool";
+export * from "./apply_patch";
 export * from "./create_job";
 export * from "./create_party";
 export * from "./create_project";

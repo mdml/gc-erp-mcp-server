@@ -77,6 +77,15 @@ export const Commitment = z.object({
 });
 export type Commitment = z.infer<typeof Commitment>;
 
+/**
+ * `voided_at` and `voided_reason` are **projection-only** state per
+ * [ADR 0009](../../../../docs/decisions/0009-void-state-projected-on-commitments.md).
+ * They materialize the voidedness decided in [ADR 0006](../../../../docs/decisions/0006-void-commitment-semantics.md)
+ * so rollups filter with a column predicate instead of scanning the
+ * patches log. They are **not** part of the SPEC §1 `Commitment` Zod
+ * shape — readers reconstructing a `Commitment` strip them; callers that
+ * need the voided state query the columns directly.
+ */
 export const commitments = sqliteTable("commitments", {
   id: text("id").$type<z.infer<typeof CommitmentId>>().primaryKey(),
   jobId: text("job_id")
@@ -89,6 +98,8 @@ export const commitments = sqliteTable("commitments", {
     .references(() => parties.id),
   price: text("price", { mode: "json" }).$type<PriceKind>().notNull(),
   signedOn: text("signed_on"),
+  voidedAt: text("voided_at"),
+  voidedReason: text("voided_reason"),
 });
 
 export const activations = sqliteTable("activations", {

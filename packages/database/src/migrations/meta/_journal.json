@@ -15,6 +15,13 @@
       "when": 1776454325086,
       "tag": "0001_white_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776456470946,
+      "tag": "0002_quick_kylun",
+      "breakpoints": true
     }
   ]
 }
