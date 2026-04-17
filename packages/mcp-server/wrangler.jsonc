@@ -19,5 +19,24 @@
     "bindings": [{ "name": "MCP_OBJECT", "class_name": "GcErpMcp" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GcErpMcp"] }],
-  "routes": [{ "pattern": "gc.leiserson.me", "custom_domain": true }]
+  "routes": [
+    {
+      "pattern": "gc.leiserson.me",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gc-erp",
+      "database_id": "e6875d68-d032-47bd-aa79-efeb90f7527e",
+      "migrations_dir": "../database/src/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS",
+      "bucket_name": "gc-erp-documents"
+    }
+  ]
 }
