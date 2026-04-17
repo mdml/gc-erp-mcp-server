@@ -1,6 +1,6 @@
 # CLAUDE.md — packages/infra
 
-Remote Cloudflare provisioning for gc-erp-mcp-server. Counterpart to `packages/dev-tools/`, which owns *local* dev env (1Password → `.envrc.enc` / `.dev.vars`). Infra owns *remote* state — custom domain today; D1, R2, and Worker-side secrets will follow as each provider lands. Never bundled into the runtime.
+Remote Cloudflare provisioning for gc-erp-mcp-server. Counterpart to `packages/dev-tools/`, which owns *local* dev env (1Password → `.envrc.enc` / `.dev.vars`). Infra owns *remote* state — custom domain, D1, and R2 today; Worker-side secrets will follow as the secrets provider lands. Never bundled into the runtime.
 
 See [ADR 0002](../../docs/decisions/0002-infra-cli.md) for the full rationale.
 
@@ -8,7 +8,7 @@ See [ADR 0002](../../docs/decisions/0002-infra-cli.md) for the full rationale.
 
 | File | Role |
 |---|---|
-| `src/infra.config.ts` | Declarative desired state (worker name, custom domain; D1/R2/secrets follow) |
+| `src/infra.config.ts` | Declarative desired state (worker name, custom domain, D1, R2; secrets follow) |
 | `src/lib/cloudflare-client.ts` | **Sole `fetch()` boundary** — `cf<T>()`, retry/backoff, `CloudflareApiError`, `accountPath` |
 | `src/lib/wrangler-adapter.ts` | *(planned)* **Sole `Bun.spawn` boundary** — `runWrangler`, `runProcess`, string-stdin Blob wrap |
 | `src/providers/*.ts` | One file per resource kind. Each exports `check` + `plan` + `apply` (+ `teardown` where applicable) |
@@ -45,7 +45,7 @@ See [ADR 0002](../../docs/decisions/0002-infra-cli.md) for the full rationale.
 bun run infra:status                # read-only; exits 0 only if everything is OK
 bun run infra:apply                 # prints the plan; exits 0 without mutating
 bun run infra:apply --yes           # executes the plan
-bun run infra:teardown --force      # destructive; detaches custom domain (+ later: deletes D1/R2, removes secrets)
+bun run infra:teardown --force      # destructive; detaches custom domain, deletes D1/R2 (+ later: removes secrets)
 ```
 
 Prereqs: `direnv` loaded with `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from 1Password. See [docs/guides/ARCHITECTURE.md §4](../../docs/guides/ARCHITECTURE.md) for the secrets flow.
