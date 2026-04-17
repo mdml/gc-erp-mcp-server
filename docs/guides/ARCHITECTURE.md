@@ -165,6 +165,17 @@ Three layers, each with a different lifecycle and a different failure mode.
 - **The deployed Worker's bearer is uploaded out-of-band.** `wrangler secret put MCP_BEARER_TOKEN` is a one-time step per rotation — deliberately not automated in v1 because rotating production should be a conscious act.
 - **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `OP_SERVICE_ACCOUNT_TOKEN` variables above only reach their child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — the values don't get hashed into the task cache key. Without the declaration, wrangler sees no auth and silently falls back to OAuth — a class of bug the env-var auth pattern is meant to prevent, so the passthrough list is part of the secrets architecture, not a build-system detail.
 
+**`CLOUDFLARE_API_TOKEN` permission groups.** The token in 1Password needs the groups listed below. A missing group presents as a 401/403 from the specific endpoint that needs it — the symptom is service-specific (e.g. R2 works but D1 fails), *not* a blanket auth failure. Watch for that pattern when a new provider lands.
+
+| Group | Scope | Why |
+|---|---|---|
+| `Account → Workers Scripts:Edit` | Account | `wrangler deploy` — upload the Worker, apply DO migrations |
+| `Account → D1:Edit` | Account | [`packages/infra`](../../packages/infra/) D1 provider (list/create/delete databases) |
+| `Account → Workers R2 Storage:Edit` | Account | [`packages/infra`](../../packages/infra/) R2 provider (list/create/delete buckets) |
+| `Zone → Workers Routes:Edit` | Zone: `leiserson.me` | `custom_domain: true` route attach via wrangler |
+
+When new providers land, the token needs a matching group added. [`packages/infra/src/providers/`](../../packages/infra/src/providers/) is the authoritative list of what endpoints we hit — if a provider's `cf()` call returns Authentication error, the failing endpoint tells you which group is missing.
+
 Files on disk, at rest:
 
 | Path                                    | Secret? | Git? | Purpose                                    |
