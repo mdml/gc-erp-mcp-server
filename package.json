@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "prepare": "if [ -d .git ]; then lefthook install; fi && bun run --cwd packages/agent-config install-agent-config",
+    "prepare": "if [ -d .git ]; then lefthook install --reset-hooks-path; fi && bun run --cwd packages/agent-config install-agent-config",
     "dev": "turbo run dev --filter=@gc-erp/mcp-server",
     "deploy": "turbo run deploy --filter=@gc-erp/mcp-server",
     "tail": "turbo run tail --filter=@gc-erp/mcp-server",
