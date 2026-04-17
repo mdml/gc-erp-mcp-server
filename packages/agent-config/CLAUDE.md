@@ -20,7 +20,7 @@ Source of truth for the team-wide Claude Code policy. Owns `.claude/settings.jso
 - **Adding an allow pattern** → edit `src/policy/allow.ts`. Run `bun run install-agent-config` and commit nothing from `.claude/` (it's gitignored; regenerated on `bun install`).
 - **Adding a deny pattern** → edit `src/policy/deny.ts`.
 - **Enabling an MCP server** → edit `src/policy/mcp.ts`.
-- **Editing worktree bootstrap steps** → edit `src/bootstrap.ts`. Keep it thin — hard-fail on any unexpected error so a broken worktree doesn't sit in a half-set-up state.
+- **Editing worktree bootstrap steps** → edit `src/bootstrap.ts`. Keep it thin — hard-fail on any unexpected error so a broken worktree doesn't sit in a half-set-up state. Note: bootstrap handles env + policy only. Base-ref alignment (the fact that `claude --worktree` branches from `origin/HEAD`, not the human's current branch) is an agent-behavior concern documented in the [root CLAUDE.md § Agent conventions](../../CLAUDE.md#agent-conventions) — not something to paper over here.
 
 ## Pattern semantics (gotchas)
 
