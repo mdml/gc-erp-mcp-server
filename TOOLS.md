@@ -2,7 +2,7 @@
 
 > Companion to [SPEC.md](SPEC.md). SPEC is the *data model* (Zod types + invariants). This file is the *verb surface* — tools, apps, and the scenarios that drive TDD.
 >
-> Status: **proposed**. Decisions this file depends on are recorded in [ADR 0003](docs/decisions/0003-storage-split.md) (D1 + R2 + DO-session-only). Schema forks resolved in §8.
+> Status: **landing incrementally.** §2 `Document` schema landed in [SPEC.md §1](SPEC.md) alongside the M1 database package. §3 tool surface is in progress per [`now.md`](docs/product/now.md). Decisions this file depends on are recorded in [ADR 0003](docs/decisions/0003-storage-split.md) (D1 + R2 + DO-session-only). Schema forks resolved in §8.
 
 ---
 
@@ -19,31 +19,9 @@
 
 ## 2. `Document` schema
 
-To land in SPEC.md §1 in a follow-up commit. Shape:
+**Landed.** Zod shape + invariants live in [SPEC.md §1](SPEC.md) (`Document`, `DocumentId`, and the `documentId: DocumentId.optional()` field on each `CostSource` variant). Drizzle table + `documentIdFor(sha256)` helper in [`packages/database/src/schema/documents.ts`](packages/database/src/schema/documents.ts). The write-side tools (§3.4) that exercise this schema are still pending — they couple with R2 binding + content-hash verification and land as their own slice.
 
-```ts
-export const DocumentId = brand("DocumentId");  // "doc_<sha256-hex>"
-
-export const Document = z.object({
-  id: DocumentId,
-  sha256: z.string().regex(/^[0-9a-f]{64}$/),     // content hash, authoritative
-  mimeType: z.string(),
-  originalFilename: z.string(),
-  sizeBytes: z.number().int().nonnegative(),
-  uploadedAt: IsoDate,
-  uploadedBy: PartyId.optional(),
-  jobId: JobId.optional(),        // optional — some docs are project-scoped (insurance, architect set)
-  tags: z.array(z.string()).default([]),  // free-form: "invoice", "plan", "contract", "receipt"
-  // invariants:
-  //   - id = "doc_" + sha256 (content-addressed; identical content → same row)
-  //   - R2 object lives at `documents/<sha256>` (key derived, not stored)
-  //   - Document rows are permanent. R2 objects may be GC'd later per retention policy.
-});
-```
-
-And `CostSource.invoice` changes from `documentRef: z.string().optional()` → `documentId: DocumentId.optional()`.
-
-**Resolved:**
+Forks resolved before landing (kept here as trail of reasoning):
 
 1. `jobId` is **optional** — project-level docs (insurance, architect's set) are first-class. "All docs for a job" is a join through `Cost.source.documentId` + direct `Document.jobId` matches.
 2. Tags are **free-form strings** for v1. Seed set: `invoice`, `plan`, `contract`, `receipt`, `photo`, `lien_waiver`. Closed enum is a post-POC decision.
@@ -326,7 +304,7 @@ New activities land via `ensure_activity` as the project surfaces them. The seed
 
 Kept as a trail of reasoning; the substance has moved into the relevant section.
 
-1. **`Document` schema** — `jobId` optional; tags free-form strings; versioning (`supersedes`) deferred. (§2.)
+1. **`Document` schema** — `jobId` optional; tags free-form strings; versioning (`supersedes`) deferred. Landed in [SPEC.md §1](SPEC.md); see §2 for the fork trail.
 2. **Commitment mutation API** — `apply_patch` is the sole commitment mutation tool; no `create_commitment` sugar. Uniform surface over more tools. (§3.2.)
 3. **`record_direct_cost` activity** — caller passes `activityId` explicitly; no inference from `source.kind`. (§3.3.)
 4. **Starter activity library** — seeded on first boot; 22-item list in §7 is the v1 seed. Adjustable by editing the seed module before first boot; after first boot, additions happen via `ensure_activity`.
@@ -337,7 +315,7 @@ Kept as a trail of reasoning; the substance has moved into the relevant section.
 
 ## 9. Doc lifecycle
 
-- **SPEC.md** is the source of truth for *types*. Once the `Document` schema (§2) lands in SPEC.md §1, this section becomes "see SPEC.md §1.<n>".
+- **SPEC.md** is the source of truth for *types*. For the `Document` schema see [SPEC.md §1](SPEC.md) (`Document` + `CostSource.documentId`); §2 here carries only the fork trail.
 - **This file** is canonical for *verbs* (tool names, inputs, outputs, scenarios). Update in the same PR that lands or changes a tool.
 - **Per-tool implementation docs** live as Zod schemas + JSDoc on each `packages/mcp-server/src/tools/<name>.ts` module. The JSDoc is what the MCP client sees at `tools/list` time. This file is orientation; the code is the machine-readable contract.
 
