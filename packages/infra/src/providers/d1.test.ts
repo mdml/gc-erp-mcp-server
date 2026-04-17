@@ -128,7 +128,12 @@ describe("applyD1", () => {
       {
         path: ["d1_databases"],
         value: [
-          { binding: "DB", database_name: "gc-erp", database_id: "new-uuid" },
+          {
+            binding: "DB",
+            database_name: "gc-erp",
+            database_id: "new-uuid",
+            migrations_dir: "../database/src/migrations",
+          },
         ],
       },
     ]);
