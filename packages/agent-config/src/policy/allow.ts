@@ -69,7 +69,9 @@ export const bashAllow: readonly string[] = [
   // Git ref fetch (no working-tree or local-branch mutation — just updates
   // remote-tracking refs). Needed at session start to compare against
   // origin before picking a base-ref alignment strategy.
-  "Bash(git fetch*)",
+  // Split bare + space-arg form so `git fetchfoo` doesn't sneak through.
+  "Bash(git fetch)",
+  "Bash(git fetch *)",
 
   // Git local writes covered by branch protection + human review at push/merge.
   "Bash(git add *)",
@@ -83,7 +85,8 @@ export const bashAllow: readonly string[] = [
   // Fast-forward-only merge — refuses if non-FF, so it can't discard local
   // commits. This is the safe alternative to `git reset --hard origin/<branch>`
   // for base-ref alignment in fresh worktrees. `git reset --hard` stays deny.
-  "Bash(git merge --ff-only*)",
+  "Bash(git merge --ff-only)",
+  "Bash(git merge --ff-only *)",
 
   // Pushes to feature branches only (force variants live in deny).
   ...featurePushPatterns,
@@ -96,9 +99,13 @@ export const bashAllow: readonly string[] = [
   // `bun pm` surfaces are registry + local-graph introspection — read-only.
   // `view` hits the npm registry for version/time metadata; `ls` and `why`
   // walk the local install graph. None of these mutate bun.lock.
-  "Bash(bun pm view*)",
-  "Bash(bun pm ls*)",
-  "Bash(bun pm why*)",
+  // Bare + space-arg form keeps `bun pm views` / `bun pm lsall` from matching.
+  "Bash(bun pm view)",
+  "Bash(bun pm view *)",
+  "Bash(bun pm ls)",
+  "Bash(bun pm ls *)",
+  "Bash(bun pm why)",
+  "Bash(bun pm why *)",
   "Bash(bunx biome*)",
   "Bash(bunx vitest*)",
   "Bash(bunx commitlint*)",
