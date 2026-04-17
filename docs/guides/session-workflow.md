@@ -45,6 +45,14 @@ Commit messages are conventional-commit. Cadence varies — the test is "does th
 4. **Push.** Solo mode: push the feature branch. Worktree mode: the parallel agent opens or updates a PR back to the feature branch.
 5. **Feature → `main`** only when the whole feature is done. Deliberate act, not a session boundary.
 
+## Parallel worktrees — operating guide
+
+When you launch parallel agents via `claude --worktree`, three details matter:
+
+- **Picking a model: count unreversed decisions.** Near-zero (pattern-matching an existing template — e.g. adding a new provider that mirrors an existing one) → Sonnet is plenty and ~5× cheaper. Three or more real judgment calls (new schema, new architecture, new dep with alternatives) → Opus. The tradeoff inverts fast at 3–5 decisions — a cheaper-but-subtly-wrong Opus-class task produces rework that dwarfs the model-cost delta.
+- **Anticipate conflicts before launching.** Before the agents start, eyeball which files both worktrees will touch and brief each with "if you touch file F, take approach X; the other worktree will take approach Y." That 30 seconds of foresight turns rebase resolution into mechanical work instead of a call back to Max at merge time.
+- **Force-pushing a rebased branch is human-only.** Policy denies `git push --force*` including `--force-with-lease` (see root [CLAUDE.md](../../CLAUDE.md) auto-allow table). Agents rebase locally, verify with `bun run gate`, then ask the human to run `! git push --force-with-lease origin <branch>`. The `!` prefix runs in-session so output lands in the conversation — no round-trip.
+
 ## What tends to go wrong
 
 - **Code-vs-docs drift discovered mid-session.** Stop. Update `now.md` and any affected guide before continuing. *This is the #1 friction in this repo* — the orientation phase exists to catch it before acting.
