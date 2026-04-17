@@ -19,6 +19,8 @@
     "code-health": "bun run --cwd packages/dev-tools code-health",
     "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools",
     "seed:kitchen-fixture": "bun run --cwd packages/database db:seed:kitchen-fixture",
+    "scenario": "bun run --cwd packages/dev-tools scenario",
+    "scenario:reset": "bun run --cwd packages/dev-tools scenario:reset",
     "db:migrate:remote": "bun run --cwd packages/mcp-server db:migrate:remote",
     "install-agent-config": "turbo run install-agent-config --filter=@gc-erp/agent-config",
     "infra:status": "bun run --cwd packages/infra infra:status",

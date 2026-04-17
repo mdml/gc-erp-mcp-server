@@ -6,11 +6,16 @@
     "sync-secrets": "bun run src/sync-secrets.ts",
     "gate": "bun run src/gate.ts",
     "code-health": "bun run src/code-health.ts",
+    "scenario": "bun run src/scenarios/run.ts",
+    "scenario:reset": "bun run src/scenarios/reset-cli.ts",
     "lint": "biome check .",
     "format": "biome check --write --unsafe .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0"
   },
   "devDependencies": {
     "@types/bun": "1.3.11",
