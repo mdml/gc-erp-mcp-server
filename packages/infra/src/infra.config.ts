@@ -3,9 +3,6 @@
  *
  * Mirrors the shape of packages/dev-tools/src/secrets.config.ts: the project
  * facts (worker name, hostname, zone) are baked here; nothing per-developer.
- *
- * Today declares only the Custom Domain. D1, R2, and Worker-scoped secrets
- * will land as additional fields + providers in follow-up changes.
  */
 
 export interface CustomDomainSpec {
@@ -13,9 +10,19 @@ export interface CustomDomainSpec {
   zone: string;
 }
 
+export interface D1Spec {
+  databaseName: string;
+}
+
+export interface R2Spec {
+  bucketName: string;
+}
+
 export interface InfraConfig {
   worker: { name: string };
   customDomain: CustomDomainSpec;
+  d1: D1Spec;
+  r2: R2Spec;
 }
 
 export const infra: InfraConfig = {
@@ -23,5 +30,13 @@ export const infra: InfraConfig = {
   customDomain: {
     hostname: "gc.leiserson.me",
     zone: "leiserson.me",
+  },
+  // NOTE: resource names are permanent once provisioned — confirm with Max before
+  // running `infra:apply --yes` for the first time.
+  d1: {
+    databaseName: "gc-erp",
+  },
+  r2: {
+    bucketName: "gc-erp-documents",
   },
 };
