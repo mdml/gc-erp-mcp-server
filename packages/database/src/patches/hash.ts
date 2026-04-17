@@ -1,19 +1,31 @@
 import type { IsoDate } from "../schema/common";
-import type { PatchId } from "../schema/ids";
+import type { JobId, PatchId } from "../schema/ids";
 import type { CommitmentEdit } from "../schema/patches";
 
 /**
  * Patch content-addressing — SPEC §1:
  *
- *   id = "pat_" + sha256(canonical(parentPatchId, edits, createdAt))
+ *   id = "pat_" + sha256(canonical(jobId, parentPatchId, edits, createdAt))
  *
  * Deterministic JSON canonicalization (keys sorted recursively) so the
- * same inputs produce the same id across runtimes. `author` and `message`
- * are intentionally NOT part of the hash input — SPEC says the id is a
- * function of parent + edits + createdAt only.
+ * same inputs produce the same id across runtimes.
+ *
+ * Hash contract (F2.1–F2.5 spike decisions):
+ *   - `author` and `message` are NOT in the hash — SPEC §1.
+ *   - `jobId` IS in the hash — self-describes the patch's job scope; cheap
+ *     belt-and-suspenders against collision across jobs (F2.1).
+ *   - `createdAt` is ms-precision IsoDate; single-operator assumption means
+ *     same-ms collision is non-issue for v1 (F2.2). Revisit with concurrency.
+ *   - `edits` array order is preserved — patches are narrative; order is
+ *     intent (F2.3). Do NOT sort.
+ *   - `Money.cents` is int; `Activation.throughput.units` is `z.number()`,
+ *     float-reserialization edge case documented as theoretical (F2.4).
+ *   - `undefined` and absent fields collapse in canonicalization (F2.5 test
+ *     locks this — see hash.test.ts).
  */
 
 export interface PatchHashInput {
+  jobId: JobId;
   parentPatchId?: PatchId;
   edits: readonly CommitmentEdit[];
   createdAt: IsoDate;
@@ -21,6 +33,7 @@ export interface PatchHashInput {
 
 export async function patchIdFor(input: PatchHashInput): Promise<PatchId> {
   const payload = {
+    jobId: input.jobId,
     parentPatchId: input.parentPatchId ?? null,
     edits: input.edits,
     createdAt: input.createdAt,

@@ -269,6 +269,8 @@ export const FRAMING_PRICE: PriceKind = {
 export interface ActivationSeed {
   id: ActivationId;
   activitySlug: string;
+  /** ADR 0005: activation attributes its pricePortion to one scope. */
+  scopeId: ScopeId;
   pricePortion: Money;
   leadTimeDays: number;
   buildTimeDays: number;
@@ -278,6 +280,7 @@ export const FRAMING_ACTIVATIONS: readonly ActivationSeed[] = [
   {
     id: KITCHEN_IDS.activations.lumberDrop,
     activitySlug: KITCHEN_ACTIVITY_SLUGS.lumberDrop,
+    scopeId: KITCHEN_IDS.scopes.demo,
     pricePortion: usd(500_00),
     leadTimeDays: 5,
     buildTimeDays: 1,
@@ -285,6 +288,7 @@ export const FRAMING_ACTIVATIONS: readonly ActivationSeed[] = [
   {
     id: KITCHEN_IDS.activations.frame,
     activitySlug: KITCHEN_ACTIVITY_SLUGS.frame,
+    scopeId: KITCHEN_IDS.scopes.framing,
     pricePortion: usd(7_000_00),
     leadTimeDays: 3,
     buildTimeDays: 3,
@@ -292,6 +296,7 @@ export const FRAMING_ACTIVATIONS: readonly ActivationSeed[] = [
   {
     id: KITCHEN_IDS.activations.punch,
     activitySlug: KITCHEN_ACTIVITY_SLUGS.punch,
+    scopeId: KITCHEN_IDS.scopes.demo,
     pricePortion: usd(1_000_00),
     leadTimeDays: 0,
     buildTimeDays: 1,
@@ -319,7 +324,6 @@ export const LUMBER_DROP_NTP = {
   id: KITCHEN_IDS.ntp.lumberDrop1,
   activationId: KITCHEN_IDS.activations.lumberDrop,
   issuedOn: "2026-04-27",
-  siteReady: true,
 } as const;
 
 // --- Day 14: first cost (lumber yard invoice) --------------------------
@@ -358,6 +362,7 @@ export const SELF_HW_ACTIVATIONS: readonly ActivationSeed[] = [
   {
     id: KITCHEN_IDS.activations.selfHw,
     activitySlug: KITCHEN_ACTIVITY_SLUGS.materialsDirect,
+    scopeId: KITCHEN_IDS.scopes.framing,
     pricePortion: usd(120_00),
     leadTimeDays: 0,
     buildTimeDays: 0,

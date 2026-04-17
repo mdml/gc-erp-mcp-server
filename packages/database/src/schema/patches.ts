@@ -11,6 +11,23 @@ import { parties } from "./parties";
  * activation add/edit/remove, and void. `edits` rides as a JSON array on
  * the `patches` row — no cost op, per SPEC ("Costs are append-only; they
  * are not patched").
+ *
+ * Scope of edits (spike forks, resolved):
+ *   - F1.1: `setActivation.fields` omits `id` AND `activityId`. Renaming the
+ *     kind-of-work after the fact rewrites history; if a typo landed at
+ *     create time, fix it via `removeActivation` + `addActivation`.
+ *   - F1.2: no `setScopes` / `setCounterparty` / `setSignedOn` op for v1.
+ *     Changing a commitment's counterparty or declared scope set is rare
+ *     enough that void + re-create (per [ADR 0006](../../../../docs/decisions/0006-void-commitment-semantics.md))
+ *     produces a cleaner audit trail than edit-log-of-identity-changes.
+ *   - F1.3: `removeActivation` with NTP events outstanding is blocked at
+ *     the `apply_patch` handler layer (invariant error). NTPs are
+ *     schedule-of-record; losing them silently would destroy audit.
+ *   - F1.4: `void` excludes the commitment from `committed` rollups; NTPs
+ *     and already-recorded costs are preserved. See ADR 0006.
+ *   - F1.5: commitment-level invariants (price-vs-sum, scope inclusion per
+ *     ADR 0005) are checked post-fold, not per-edit. See
+ *     `invariants/commitments.ts` and [ADR 0008](../../../../docs/decisions/0008-apply-patch-atomicity-via-d1-batch.md).
  */
 export const CommitmentEdit = z.discriminatedUnion("op", [
   z.object({ op: z.literal("create"), commitment: Commitment }),
@@ -28,11 +45,13 @@ export const CommitmentEdit = z.discriminatedUnion("op", [
     op: z.literal("setActivation"),
     commitmentId: CommitmentId,
     activationId: ActivationId,
-    // `id` is omitted — the activation being patched is named by
-    // `activationId`; letting callers pass a different `id` in `fields`
-    // would either be a no-op or silently rename the row. SPEC says
-    // `Activation.partial()`; we tighten to make the no-op unrepresentable.
-    fields: Activation.omit({ id: true }).partial(),
+    // `id` and `activityId` are both omitted (F1.1):
+    //   - `id` would either no-op or silently rename the row.
+    //   - `activityId` would rewrite the kind-of-work retroactively, which
+    //     is identity-rewriting the activation; force remove+add if wrong.
+    // SPEC says `Activation.partial()`; we tighten both omissions to make
+    // the identity-mutating cases unrepresentable.
+    fields: Activation.omit({ id: true, activityId: true }).partial(),
   }),
   z.object({
     op: z.literal("removeActivation"),

@@ -46,10 +46,14 @@ export type Throughput = z.infer<typeof Throughput>;
 /**
  * Activation — SPEC §1. Belongs to exactly one Commitment (enforced by FK
  * once the row is inserted). NTP fires per-Activation, not per-Commitment.
+ * `scopeId` attributes this activation's pricePortion to one scope — the
+ * unit of rollup granularity. Invariant: `scopeId ∈ Commitment.scopeIds`
+ * (see ADR 0005).
  */
 export const Activation = z.object({
   id: ActivationId,
   activityId: ActivityId,
+  scopeId: ScopeId,
   pricePortion: Money,
   leadTime: Duration,
   buildTime: Duration,
@@ -97,6 +101,10 @@ export const activations = sqliteTable("activations", {
     .$type<z.infer<typeof ActivityId>>()
     .notNull()
     .references(() => activities.id),
+  scopeId: text("scope_id")
+    .$type<z.infer<typeof ScopeId>>()
+    .notNull()
+    .references(() => scopes.id),
   pricePortionCents: integer("price_portion_cents").notNull(),
   leadTimeDays: integer("lead_time_days").notNull(),
   buildTimeDays: integer("build_time_days").notNull(),

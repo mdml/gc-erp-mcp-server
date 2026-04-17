@@ -17,6 +17,7 @@ describe("CommitmentEdit Zod", () => {
           {
             id: "actv_1",
             activityId: "act_frame",
+            scopeId: "scope_demo",
             pricePortion: usd(100),
             leadTime: { days: 0 },
             buildTime: { days: 1 },
@@ -35,6 +36,7 @@ describe("CommitmentEdit Zod", () => {
       activation: {
         id: "actv_2",
         activityId: "act_punch",
+        scopeId: "scope_demo",
         pricePortion: usd(50),
         leadTime: { days: 0 },
         buildTime: { days: 1 },
@@ -66,6 +68,28 @@ describe("CommitmentEdit Zod", () => {
       voidOp,
     ]) {
       expect(CommitmentEdit.parse(v)).toEqual(v);
+    }
+  });
+
+  it("setActivation.fields strips activityId (F1.1 tightening)", () => {
+    // activityId is omitted from the setActivation field mask. Passing it
+    // is allowed by Zod's default strip behavior, but the parsed output
+    // drops it — operators who need to change the kind-of-work must
+    // removeActivation + addActivation, which preserves audit clarity.
+    const withActivityId = {
+      op: "setActivation" as const,
+      commitmentId: "cm_frame",
+      activationId: "actv_1",
+      fields: { activityId: "act_other", pricePortion: usd(150) },
+    };
+    const parsed = CommitmentEdit.parse(withActivityId);
+    expect(parsed).toMatchObject({
+      op: "setActivation",
+      fields: { pricePortion: usd(150) },
+    });
+    // `fields.activityId` should not survive parsing.
+    if (parsed.op === "setActivation") {
+      expect("activityId" in parsed.fields).toBe(false);
     }
   });
 });

@@ -8,6 +8,13 @@
       "when": 1776436388312,
       "tag": "0000_careless_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1776454325086,
+      "tag": "0001_white_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

@@ -112,6 +112,7 @@ function createCommitmentEdit(
       activations: activationSeeds.map((a) => ({
         id: a.id,
         activityId: resolveOrThrow(activityIds, a.activitySlug),
+        scopeId: a.scopeId,
         pricePortion: a.pricePortion,
         leadTime: { days: a.leadTimeDays },
         buildTime: { days: a.buildTimeDays },
@@ -142,6 +143,7 @@ function insertActivations(
         id: a.id,
         commitmentId,
         activityId: resolveOrThrow(activityIds, a.activitySlug),
+        scopeId: a.scopeId,
         pricePortionCents: a.pricePortion.cents,
         leadTimeDays: a.leadTimeDays,
         buildTimeDays: a.buildTimeDays,
@@ -361,6 +363,7 @@ async function insertCreatePatch(
 ): Promise<NonNullable<Patch["parentPatchId"]>> {
   const edits = [input.edit];
   const id = await patchIdFor({
+    jobId: input.jobId,
     parentPatchId: input.parentPatchId,
     edits,
     createdAt: input.createdAt,
