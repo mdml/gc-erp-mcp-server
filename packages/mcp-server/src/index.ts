@@ -4,6 +4,7 @@ import { McpAgent } from "agents/mcp";
 import { makeFetchHandler } from "./handler";
 import {
   createJob,
+  createParty,
   createProject,
   createScope,
   ensureActivity,
@@ -46,6 +47,7 @@ export class GcErpMcp extends McpAgent<Env> {
     const db = () => createDatabaseClient(this.env.DB);
     registerToolOn(this.server, createProject, db);
     registerToolOn(this.server, createJob, db);
+    registerToolOn(this.server, createParty, db);
     registerToolOn(this.server, createScope, db);
     registerToolOn(this.server, updateScope, db);
     registerToolOn(this.server, listJobs, db);
