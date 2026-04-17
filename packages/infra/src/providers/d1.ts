@@ -6,7 +6,17 @@
  * into packages/mcp-server/wrangler.jsonc via jsonc-parser so comments survive.
  *
  * Binding shape written to wrangler.jsonc:
- *   d1_databases: [{ binding: "DB", database_name: "...", database_id: "..." }]
+ *   d1_databases: [{
+ *     binding: "DB",
+ *     database_name: "...",
+ *     database_id: "...",
+ *     migrations_dir: "../database/src/migrations",
+ *   }]
+ *
+ * `migrations_dir` is resolved by wrangler relative to wrangler.jsonc's own
+ * directory (packages/mcp-server/), so the literal string points at
+ * packages/database/src/migrations/. Keeping the path in the binding means
+ * `wrangler d1 migrations apply <db> --remote` finds our SQL without a flag.
  */
 
 import type { InfraConfig } from "../infra.config";
@@ -66,7 +76,14 @@ export async function applyD1(action: D1Action): Promise<void> {
   patchWranglerJsonc([
     {
       path: ["d1_databases"],
-      value: [{ binding: "DB", database_name: db.name, database_id: db.uuid }],
+      value: [
+        {
+          binding: "DB",
+          database_name: db.name,
+          database_id: db.uuid,
+          migrations_dir: "../database/src/migrations",
+        },
+      ],
     },
   ]);
 }
