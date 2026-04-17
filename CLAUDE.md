@@ -42,10 +42,14 @@ These forms run without a permission prompt (policy lives in [packages/agent-con
 |---|---|---|
 | `bun install …` | `bun install`, `bun install --frozen-lockfile` | |
 | `bun run <anything>` | `bun run gate`, `bun run test`, `bun run --cwd packages/mcp-server test`, `bun run --filter @gc-erp/mcp-server test` | Broad glob. Flag position doesn't matter — `--cwd`, `--filter`, and extra args all match. |
+| `bun pm view/ls/why …` | `bun pm view drizzle-orm time`, `bun pm ls --all`, `bun pm why esbuild` | Read-only: registry metadata + local-graph introspection. No lockfile mutation. |
 | `bunx <tool> …` | `bunx biome check .`, `bunx vitest run`, `bunx tsc --noEmit`, `bunx turbo run test` | Limited to the tools enumerated in `allow.ts` (biome, vitest, commitlint, tsc, turbo). |
 | `turbo run <task> …` | `turbo run test --filter=@gc-erp/mcp-server`, `turbo run typecheck` | Works for every task except `deploy` (denied). |
+| `git fetch …` | `git fetch`, `git fetch origin feat/m1-data-model` | Updates remote-tracking refs only; no working-tree mutation. |
+| `git merge --ff-only …` | `git merge --ff-only origin/feat/m1-data-model` | Fast-forward only — refuses if non-FF, so it can't discard local commits. Safe alternative to `git reset --hard` for base-ref alignment. |
 | `git push origin <prefix>/*` | `git push origin slice/3-infra`, `git push -u origin feat/foo` | Conventional-commit prefixes only. Bare `git push` and pushes to `main` stay ASK. |
 | `gh pr view/create/comment/edit/ready` | `gh pr create --title …`, `gh pr view 42` | Full list in `allow.ts`. |
+| `mkdir -p …` | `mkdir -p packages/database/src/schema` | Scaffolding dirs. Empty-dir creation is reversible; `rm -rf` stays deny. |
 
 What **never** auto-runs (by deny):
 
