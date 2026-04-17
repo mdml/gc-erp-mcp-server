@@ -8,6 +8,8 @@
 
 import { infra } from "./infra.config";
 import { checkCustomDomain } from "./providers/custom-domain";
+import { checkD1 } from "./providers/d1";
+import { checkR2 } from "./providers/r2";
 
 export interface StatusRow {
   resource: string;
@@ -15,40 +17,86 @@ export interface StatusRow {
   detail?: string;
 }
 
-async function collect(): Promise<StatusRow[]> {
-  const rows: StatusRow[] = [];
-
+async function customDomainRow(): Promise<StatusRow> {
+  const label = `custom-domain ${infra.customDomain.hostname}`;
   try {
     const cd = await checkCustomDomain(infra);
-    const label = `custom-domain ${infra.customDomain.hostname}`;
     if (cd.kind === "attached") {
-      rows.push({
+      return {
         resource: label,
         state: "ok",
         detail: `id=${cd.id} service=${cd.service}`,
-      });
-    } else if (cd.kind === "missing") {
-      rows.push({
+      };
+    }
+    if (cd.kind === "missing") {
+      return {
         resource: label,
         state: "missing",
         detail: "declared in wrangler.jsonc; run `bun run deploy` to attach",
-      });
-    } else {
-      rows.push({
-        resource: label,
-        state: "drift",
-        detail: `attached to "${cd.existing.service}" (expected "${cd.expected.service}")`,
-      });
+      };
     }
+    return {
+      resource: label,
+      state: "drift",
+      detail: `attached to "${cd.existing.service}" (expected "${cd.expected.service}")`,
+    };
   } catch (err) {
-    rows.push({
-      resource: `custom-domain ${infra.customDomain.hostname}`,
+    return {
+      resource: label,
       state: "error",
       detail: err instanceof Error ? err.message : String(err),
-    });
+    };
   }
+}
 
-  return rows;
+async function d1Row(): Promise<StatusRow> {
+  const label = `d1 ${infra.d1.databaseName}`;
+  try {
+    const d1 = await checkD1(infra);
+    if (d1.kind === "exists") {
+      return {
+        resource: label,
+        state: "ok",
+        detail: `uuid=${d1.database.uuid}`,
+      };
+    }
+    return {
+      resource: label,
+      state: "missing",
+      detail: "run `bun run infra:apply --yes` to create",
+    };
+  } catch (err) {
+    return {
+      resource: label,
+      state: "error",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function r2Row(): Promise<StatusRow> {
+  const label = `r2 ${infra.r2.bucketName}`;
+  try {
+    const r2 = await checkR2(infra);
+    if (r2.kind === "exists") {
+      return { resource: label, state: "ok" };
+    }
+    return {
+      resource: label,
+      state: "missing",
+      detail: "run `bun run infra:apply --yes` to create",
+    };
+  } catch (err) {
+    return {
+      resource: label,
+      state: "error",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function collect(): Promise<StatusRow[]> {
+  return Promise.all([customDomainRow(), d1Row(), r2Row()]);
 }
 
 function renderText(rows: StatusRow[]): void {
