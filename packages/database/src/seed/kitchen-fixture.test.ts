@@ -134,6 +134,7 @@ describe("seedKitchenFixture", () => {
         activations: activationRows.map((a) => ({
           id: a.id,
           activityId: a.activityId,
+          scopeId: a.scopeId,
           pricePortion: usd(a.pricePortionCents),
           leadTime: { days: a.leadTimeDays },
           buildTime: { days: a.buildTimeDays },

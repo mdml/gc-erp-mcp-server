@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IsoDate } from "../schema/common";
-import type { CommitmentId, PatchId } from "../schema/ids";
+import type { CommitmentId, JobId, PatchId } from "../schema/ids";
 import type { CommitmentEdit } from "../schema/patches";
 import { patchIdFor } from "./hash";
 
@@ -10,54 +10,55 @@ const voidEdit: CommitmentEdit = {
   reason: "dup",
 };
 
+const jobId = "job_k" as JobId;
+const createdAt = "2026-04-18T12:00:00Z" as IsoDate;
+
 describe("patchIdFor", () => {
   it("returns a deterministic pat_<64 hex chars>", async () => {
-    const id = await patchIdFor({
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
-    });
+    const id = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
     expect(id).toMatch(/^pat_[0-9a-f]{64}$/);
 
-    const again = await patchIdFor({
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
-    });
+    const again = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
     expect(again).toBe(id);
   });
 
   it("differs when parentPatchId changes", async () => {
-    const a = await patchIdFor({
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
-    });
+    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
     const b = await patchIdFor({
+      jobId,
       parentPatchId: "pat_parent" as PatchId,
       edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
+      createdAt,
     });
     expect(a).not.toBe(b);
   });
 
   it("differs when edits change", async () => {
-    const a = await patchIdFor({
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
-    });
+    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
     const b = await patchIdFor({
+      jobId,
       edits: [{ ...voidEdit, reason: "different" }],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
+      createdAt,
     });
     expect(a).not.toBe(b);
   });
 
   it("differs when createdAt changes", async () => {
-    const a = await patchIdFor({
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
-    });
+    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
     const b = await patchIdFor({
+      jobId,
       edits: [voidEdit],
       createdAt: "2026-04-18T12:00:01Z" as IsoDate,
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("differs when jobId changes (F2.1)", async () => {
+    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
+    const b = await patchIdFor({
+      jobId: "job_other" as JobId,
+      edits: [voidEdit],
+      createdAt,
     });
     expect(a).not.toBe(b);
   });
@@ -77,13 +78,53 @@ describe("patchIdFor", () => {
         op: "setPrice",
       }),
     );
+    const a = await patchIdFor({ jobId, edits: [e1], createdAt });
+    const b = await patchIdFor({ jobId, edits: [e2], createdAt });
+    expect(a).toBe(b);
+  });
+
+  it("treats undefined and absent optional fields as equivalent (F2.5)", async () => {
+    // A create edit whose commitment has `signedOn: undefined` should hash
+    // the same as the same edit with `signedOn` absent entirely. Canonical
+    // serialization drops undefined-valued keys before stringification —
+    // this test locks that behavior against regression.
+    const baseCommitment = {
+      id: "cm_x",
+      jobId,
+      scopeIds: ["scope_1"],
+      counterpartyId: "party_1",
+      price: {
+        kind: "lump",
+        total: { cents: 100, currency: "USD" },
+      },
+      activations: [
+        {
+          id: "actv_1",
+          activityId: "act_frame",
+          scopeId: "scope_1",
+          pricePortion: { cents: 100, currency: "USD" },
+          leadTime: { days: 0 },
+          buildTime: { days: 0 },
+        },
+      ],
+    };
+    const withUndef = {
+      op: "create",
+      commitment: { ...baseCommitment, signedOn: undefined },
+    } as unknown as CommitmentEdit;
+    const withAbsent = {
+      op: "create",
+      commitment: baseCommitment,
+    } as unknown as CommitmentEdit;
     const a = await patchIdFor({
-      edits: [e1],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
+      jobId,
+      edits: [withUndef],
+      createdAt,
     });
     const b = await patchIdFor({
-      edits: [e2],
-      createdAt: "2026-04-18T12:00:00Z" as IsoDate,
+      jobId,
+      edits: [withAbsent],
+      createdAt,
     });
     expect(a).toBe(b);
   });

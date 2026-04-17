@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { z } from "zod";
 import { activations } from "./commitments";
 import { IsoDay } from "./common";
@@ -9,15 +9,19 @@ import { ActivationId, NTPEventId } from "./ids";
  * delay); the latest one is authoritative for schedule. Immutable — no
  * UPDATE; re-NTP by inserting a new row.
  *
- * Derived (not stored):
+ * Derived (not stored) per ADR 0007 — recomputed from CURRENT activation
+ * state on read, not frozen at issue time:
  *   startBy  = issuedOn + activation.leadTime
  *   finishBy = startBy   + activation.buildTime
+ *
+ * No `siteReady` flag. The "NTP'd but site not ready" case is covered by
+ * a future DelayEvent (backlog: "Schedule event log — DelayEvent +
+ * activation closure"). See ADR 0007.
  */
 export const NTPEvent = z.object({
   id: NTPEventId,
   activationId: ActivationId,
   issuedOn: IsoDay,
-  siteReady: z.boolean(),
   note: z.string().optional(),
 });
 export type NTPEvent = z.infer<typeof NTPEvent>;
@@ -29,7 +33,6 @@ export const ntpEvents = sqliteTable("ntp_events", {
     .notNull()
     .references(() => activations.id),
   issuedOn: text("issued_on").notNull(),
-  siteReady: integer("site_ready", { mode: "boolean" }).notNull(),
   note: text("note"),
 });
 

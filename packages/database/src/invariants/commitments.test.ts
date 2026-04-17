@@ -9,6 +9,7 @@ import type {
   ScopeId,
 } from "../schema/ids";
 import {
+  assertActivationScopesInCommitment,
   assertCommitmentPriceMatchesActivations,
   CommitmentInvariantError,
 } from "./commitments";
@@ -25,6 +26,7 @@ const baseLump: Commitment = {
     {
       id: "actv_a" as ActivationId,
       activityId: "act_a" as ActivityId,
+      scopeId: "scope_1" as ScopeId,
       pricePortion: usd(50_000),
       leadTime: { days: 5 },
       buildTime: { days: 1 },
@@ -32,6 +34,7 @@ const baseLump: Commitment = {
     {
       id: "actv_b" as ActivationId,
       activityId: "act_b" as ActivityId,
+      scopeId: "scope_1" as ScopeId,
       pricePortion: usd(700_000),
       leadTime: { days: 3 },
       buildTime: { days: 3 },
@@ -39,6 +42,7 @@ const baseLump: Commitment = {
     {
       id: "actv_c" as ActivationId,
       activityId: "act_c" as ActivityId,
+      scopeId: "scope_1" as ScopeId,
       pricePortion: usd(100_000),
       leadTime: { days: 0 },
       buildTime: { days: 1 },
@@ -65,8 +69,11 @@ describe("assertCommitmentPriceMatchesActivations", () => {
       expect(e).toBeInstanceOf(CommitmentInvariantError);
       const err = e as CommitmentInvariantError;
       expect(err.code).toBe("price_total_mismatch");
-      expect(err.expectedCents).toBe(1_000_000);
-      expect(err.actualCents).toBe(850_000);
+      expect(err.details).toMatchObject({
+        expectedCents: 1_000_000,
+        actualCents: 850_000,
+        kind: "lump",
+      });
     }
   });
 
@@ -105,5 +112,48 @@ describe("assertCommitmentPriceMatchesActivations", () => {
     expect(() => assertCommitmentPriceMatchesActivations(c)).toThrow(
       CommitmentInvariantError,
     );
+  });
+});
+
+describe("assertActivationScopesInCommitment (ADR 0005)", () => {
+  it("accepts when every activation.scopeId ∈ commitment.scopeIds", () => {
+    const c: Commitment = {
+      ...baseLump,
+      scopeIds: ["scope_1" as ScopeId, "scope_2" as ScopeId],
+      activations: baseLump.activations.map((a) => ({
+        ...a,
+        scopeId: "scope_2" as ScopeId,
+      })),
+    };
+    expect(() => assertActivationScopesInCommitment(c)).not.toThrow();
+  });
+
+  it("rejects an activation whose scopeId isn't declared on the commitment", () => {
+    const c: Commitment = {
+      ...baseLump,
+      scopeIds: ["scope_1" as ScopeId],
+      activations: [
+        { ...baseLump.activations[0], scopeId: "scope_rogue" as ScopeId },
+        baseLump.activations[1],
+        baseLump.activations[2],
+      ],
+    };
+    try {
+      assertActivationScopesInCommitment(c);
+      throw new Error("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(CommitmentInvariantError);
+      const err = e as CommitmentInvariantError;
+      expect(err.code).toBe("activation_scope_not_in_commitment");
+      expect(err.details).toMatchObject({
+        activationId: "actv_a",
+        activationScopeId: "scope_rogue",
+        commitmentScopeIds: ["scope_1"],
+      });
+    }
+  });
+
+  it("accepts a commitment with a single scope used by all activations", () => {
+    expect(() => assertActivationScopesInCommitment(baseLump)).not.toThrow();
   });
 });

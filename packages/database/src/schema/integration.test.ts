@@ -158,6 +158,7 @@ describe("full schema round-trip (better-sqlite3)", () => {
         id: activationId,
         commitmentId,
         activityId,
+        scopeId: childScopeId,
         pricePortionCents: 700_000,
         leadTimeDays: 3,
         buildTimeDays: 3,
@@ -174,7 +175,6 @@ describe("full schema round-trip (better-sqlite3)", () => {
         id: ntpId,
         activationId,
         issuedOn: "2026-04-27",
-        siteReady: true,
       })
       .run();
 
@@ -218,7 +218,7 @@ describe("full schema round-trip (better-sqlite3)", () => {
     const edits: CommitmentEdit[] = [
       { op: "void", commitmentId, reason: "replaced in CO #1" },
     ];
-    const patchId = await patchIdFor({ edits, createdAt });
+    const patchId = await patchIdFor({ jobId, edits, createdAt });
     db.insert(patches)
       .values({
         id: patchId,
@@ -291,7 +291,7 @@ describe("full schema round-trip (better-sqlite3)", () => {
       .from(ntpEvents)
       .where(sql`${ntpEvents.id} = ${ntpId}`)
       .get();
-    expect(ntpRow?.siteReady).toBe(true);
+    expect(ntpRow?.issuedOn).toBe("2026-04-27");
   });
 
   it("rejects a missing FK target at the database level", () => {

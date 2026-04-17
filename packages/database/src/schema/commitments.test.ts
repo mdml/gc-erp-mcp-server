@@ -44,6 +44,7 @@ describe("Activation Zod", () => {
     const minimal = {
       id: "actv_a",
       activityId: "act_frame",
+      scopeId: "scope_framing",
       pricePortion: usd(700_000),
       leadTime: { days: 3 },
       buildTime: { days: 3 },
@@ -55,6 +56,17 @@ describe("Activation Zod", () => {
       throughput: { units: 20, per: "day" as const, unit: "lf" },
     };
     expect(Activation.parse(full)).toEqual(full);
+  });
+
+  it("requires scopeId (ADR 0005)", () => {
+    const noScope: Record<string, unknown> = {
+      id: "actv_a",
+      activityId: "act_frame",
+      pricePortion: usd(700_000),
+      leadTime: { days: 3 },
+      buildTime: { days: 3 },
+    };
+    expect(() => Activation.parse(noScope)).toThrow();
   });
 });
 
@@ -69,6 +81,7 @@ describe("Commitment Zod", () => {
       {
         id: "actv_drop",
         activityId: "act_lumberDrop",
+        scopeId: "scope_demo",
         pricePortion: usd(50_000),
         leadTime: { days: 5 },
         buildTime: { days: 1 },
@@ -76,6 +89,7 @@ describe("Commitment Zod", () => {
       {
         id: "actv_frame",
         activityId: "act_frame",
+        scopeId: "scope_framing",
         pricePortion: usd(700_000),
         leadTime: { days: 3 },
         buildTime: { days: 3 },
@@ -83,6 +97,7 @@ describe("Commitment Zod", () => {
       {
         id: "actv_punch",
         activityId: "act_punch",
+        scopeId: "scope_demo",
         pricePortion: usd(100_000),
         leadTime: { days: 0 },
         buildTime: { days: 1 },
