@@ -48,6 +48,10 @@ export async function planR2(config: InfraConfig): Promise<R2Action> {
 
 export async function applyR2(action: R2Action): Promise<void> {
   if (action.kind === "noop") return;
+  // NOTE: Overwrites r2_buckets as a single-entry array. If infra.config.ts ever
+  // holds >1 R2 spec, change patchWranglerJsonc here to merge-append, not replace.
+  // NOTE: Partial-failure — if POST succeeds but patchWranglerJsonc throws, the bucket
+  // exists in CF with no binding in wrangler.jsonc. Fix: add it manually, or teardown + re-apply.
   await cf("POST", accountPath("/r2/buckets"), { name: action.bucketName });
   patchWranglerJsonc([
     {
