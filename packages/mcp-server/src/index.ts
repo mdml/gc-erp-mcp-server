@@ -2,7 +2,16 @@ import { createDatabaseClient } from "@gc-erp/database";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { makeFetchHandler } from "./handler";
-import { createJob, ensureActivity, listJobs, registerToolOn } from "./tools";
+import {
+  createJob,
+  createProject,
+  createScope,
+  ensureActivity,
+  listJobs,
+  listScopes,
+  registerToolOn,
+  updateScope,
+} from "./tools";
 
 interface Env {
   MCP_BEARER_TOKEN: string;
@@ -35,8 +44,12 @@ export class GcErpMcp extends McpAgent<Env> {
     );
 
     const db = () => createDatabaseClient(this.env.DB);
+    registerToolOn(this.server, createProject, db);
     registerToolOn(this.server, createJob, db);
+    registerToolOn(this.server, createScope, db);
+    registerToolOn(this.server, updateScope, db);
     registerToolOn(this.server, listJobs, db);
+    registerToolOn(this.server, listScopes, db);
     registerToolOn(this.server, ensureActivity, db);
   }
   /* v8 ignore stop */
