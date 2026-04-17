@@ -2,8 +2,15 @@
 # See: https://google.github.io/osv-scanner/configuration/
 #
 # Ignored vulns require both a reason and an ignoreUntil expiry.
-#
-# [[IgnoredVulns]]
-# id = "GHSA-xxxx-yyyy-zzzz"
-# ignoreUntil = "2026-07-01T00:00:00Z"
-# reason = "No fix available; mitigated by ..."
+
+[[IgnoredVulns]]
+id = "GHSA-67mh-4wv8-2f99"
+ignoreUntil = "2026-07-17T00:00:00Z"
+# esbuild 0.18.20 is pulled transitively by drizzle-kit (via
+# @esbuild-kit/esm-loader). The advisory is a CORS misconfiguration on
+# esbuild's dev-server HTTP endpoint — we only invoke drizzle-kit as a CLI
+# for `drizzle-kit generate`, which never starts the dev server, and
+# drizzle-kit is a devDependency (never bundled into the Worker). Fixed
+# when drizzle-kit ships a release on @esbuild-kit/esm-loader >=2.6.6 or
+# bumps off esbuild-kit entirely; revisit in July 2026.
+reason = "esbuild dev-server CORS CVE in drizzle-kit transitive — dev server never invoked; drizzle-kit is build-time only"
