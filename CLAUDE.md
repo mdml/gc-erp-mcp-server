@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-erp-mcp-server
 
-> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/)
+> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
 
 ## Project overview
 
@@ -122,11 +122,21 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 - **Prefer the dedicated tool over Bash.** Read/Edit/Glob/Grep are the right tools; reach for Bash only when they genuinely can't express the operation.
 - **`claude --worktree` branches from `origin/HEAD`, not your current local branch.** The new worktree checks out `worktree-<name>` based on `origin/HEAD` (typically `origin/main`) regardless of what branch the human was on when they ran it. There is no CLI flag to override. In practice the human usually launched the worktree to continue work on a local feature branch (`slice/N-foo`, `feat/…`) — confirm the intended base before committing. Typical remediation once the human names the branch: `git fetch origin <branch> && git reset --hard origin/<branch>` (or `git merge origin/<branch>` if the worktree already has commits on top). Caveat: the human's local branch may have unpushed commits that `origin/<branch>` doesn't have — if so, ask them to `git push` first, or confirm they're fine continuing from the remote tip. Worktree first-run plumbing (secret copy, bootstrap) is handled by [packages/agent-config/src/bootstrap.ts](packages/agent-config/src/bootstrap.ts) and [.worktreeinclude](.worktreeinclude); base-ref alignment is not.
 
+## Session rhythm
+
+How a session flows — applies to humans and agents both. Full walkthrough in [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
+
+- **Start:** read [`now.md`](docs/product/now.md) + last 1–2 [retros](docs/retros/) + `git log --oneline -10` against the feature branch. **Audit the top `now.md` item against the actual code before acting** — doc-vs-code drift is the #1 friction in this repo.
+- **Default branching:** feature branch (`slice/N-foo` or `feat/topic`) — either solo-on-branch or parallel agents via `claude --worktree` opening PRs back to the feature branch. Merge to `main` only when the whole feature lands.
+- **During:** question → [backlog](docs/product/backlog.md); decision → ADR or SPEC/TOOLS; architecture → [ARCHITECTURE.md](docs/guides/ARCHITECTURE.md) same commit; invariant → per-package `CLAUDE.md`.
+- **End:** update `now.md` (done → "Recently done", keep ≤3); log a [retro](docs/retros/CLAUDE.md) if the session was meaningful; commit everything (retro included) in conventional-commit style. Granularity varies — not one-commit-per-session.
+
 ## Quick links for new contributors
 
 - **"I want to run it locally."** → [README.md](README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](SPEC.md) → Narrative walkthrough.
 - **"I want to know how it's *built*."** → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md).
+- **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
 - **"I want to change a tool's response."** → [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
 - **"I want to add a new secret."** → [packages/dev-tools/CLAUDE.md](packages/dev-tools/CLAUDE.md) → `src/secrets.config.ts`.
 - **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.

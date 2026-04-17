@@ -7,6 +7,7 @@ Guides describe **how the system currently works**. If the code changes in a way
 | Guide | What it covers |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Repo layout, runtime lifecycle, secrets flow, deploy, quality gates, toolchain choices. |
+| [session-workflow.md](session-workflow.md) | How a working session flows — orient → work → close. Branching model, where changes land, what tends to go wrong. |
 
 ## When to update
 

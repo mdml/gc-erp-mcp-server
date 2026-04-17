@@ -4,6 +4,10 @@ Conventions for workspace packages under `packages/`.
 
 > **Every package (and every app, when we add the `apps/` tree) has its own `CLAUDE.md`.** Package-scoped instructions beat project-wide ones because Claude Code loads the nearest CLAUDE.md for any file it touches. When you create a new package, creating its CLAUDE.md is part of the checklist — not a later polish step.
 
+## Naming
+
+Package names are **scope nouns or noun-phrases** (`mcp-server`, `dev-tools`, `infra`, `agent-config`) — what the package *is*, not what kind of thing it is. Role words (`lib`, `utils`, `common`, `shared`, `core`) are wrong: they describe a category, not a scope, and tend to grow into dumping grounds. If you can't name a package in one or two words that describe its job, it probably shouldn't be its own package yet.
+
 ## New package checklist
 
 When creating a new package:

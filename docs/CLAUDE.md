@@ -10,7 +10,7 @@ How our docs are organized and when to update each. Each subdirectory has its ow
 | [`docs/guides/`](guides/) | Orientation guides (ARCHITECTURE, etc.) | **Current state** — how things work right now | When architecture or tooling changes |
 | [`docs/decisions/`](decisions/) | Architecture Decision Records (ADRs) | **Why decisions were made** — rationale, options, trade-offs | Per decision; ADRs are immutable once active |
 | [`docs/spikes/`](#spikes) | Active time-boxed investigations | Ephemeral working docs — never permanent | Created and deleted as investigations run |
-| [`docs/intent-agents.md`](intent-agents.md) | Scratch: evaluating Intent as a workflow alternative | Notes toward a decision | Ad hoc |
+| [`docs/retros/`](retros/) | Retro logs — observations, decisions, actions per session | Append-only; daily-ish |
 
 Three files that are *not* under `docs/` but are part of the doc landscape:
 

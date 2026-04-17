@@ -55,7 +55,7 @@ Turbo-managed bun workspace. Two packages at v1:
 │   │   └── CLAUDE.md
 │   ├── product/                     # goal, scope, milestones, backlog
 │   ├── decisions/                   # architecture decision records (template + seeded)
-│   └── intent-agents.md             # scratch: evaluating Intent as a workflow alternative
+│   └── retros/                      # retro logs (daily-ish; append-only)
 ├── biome.json                       # lint + format (single tool)
 ├── bunfig.toml                      # exact versions, text lockfile, 7-day release age
 ├── commitlint.config.ts             # conventional commits (standard types only)

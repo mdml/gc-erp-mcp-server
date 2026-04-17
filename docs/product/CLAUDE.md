@@ -9,14 +9,16 @@ Docs under `docs/product/` describe **what we're building and why**. They're the
 | [overview.md](overview.md) | Goal, success criteria, collaborators | Rarely — the north star |
 | [scope.md](scope.md) | What's in / out of v1 | When scope shifts |
 | [milestones.md](milestones.md) | Milestone plan (M1–M6) and status | As milestones complete |
-| [backlog.md](backlog.md) | Unresolved questions + product-level TODOs | Continuously — items move to ADRs or SPEC.md as they resolve |
+| [now.md](now.md) | Ordered current-sprint tasks | Start/end of each working session |
+| [backlog.md](backlog.md) | Unresolved questions (single source) | Continuously — items move to ADRs or SPEC.md as they resolve |
 
 ## When to update
 
 - **Update `overview.md`** only when the fundamental pitch of the product changes. It should feel stable.
 - **Update `scope.md`** when we consciously add or drop a v1 feature. New feature? Either it's in v1 (update scope) or it's not (and it stays out until we decide).
-- **Update `milestones.md`** when a milestone lands, gets redefined, or is added.
-- **Update `backlog.md`** whenever a question resolves. The resolution either becomes an ADR (`docs/decisions/`) or lands in SPEC.md — the backlog entry should then be crossed off and a one-line pointer left in its place.
+- **Update `milestones.md`** when a milestone lands, gets redefined, or is added. Keep entries one-liner north stars — session-level detail belongs in `now.md`.
+- **Update `now.md`** at the start and end of each working session. It's the ordered next-N tasks, not a log.
+- **Update `backlog.md`** whenever a question resolves. The resolution either becomes an ADR (`docs/decisions/`) or lands in SPEC.md / TOOLS.md — the backlog entry should then be crossed off and a one-line pointer left in its place. Backlog is the *only* place open questions live; don't duplicate them in SPEC or TOOLS.
 
 ## Not in scope here
 
