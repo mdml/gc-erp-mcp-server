@@ -3,6 +3,7 @@ import { timingSafeEqual } from "./auth";
 interface Env {
   MCP_BEARER_TOKEN: string;
   MCP_OBJECT: DurableObjectNamespace;
+  DB: D1Database;
 }
 
 export interface McpFetcher {
