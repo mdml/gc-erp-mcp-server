@@ -28,6 +28,7 @@ export const NTPEventId     = brand("NTPEventId");
 export const CostId         = brand("CostId");
 export const PatchId        = brand("PatchId");
 export const PartyId        = brand("PartyId"); // people + orgs
+export const DocumentId     = brand("DocumentId");
 
 // --- Shared --------------------------------------------------------------
 
@@ -181,13 +182,36 @@ export const NTPEvent = z.object({
   //   - cannot be mutated; issue a new NTPEvent to re-NTP
 });
 
+// --- Document: content-addressed blob metadata --------------------------
+
+export const Document = z.object({
+  id: DocumentId,                                   // canonical form: "doc_" + sha256
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),       // authoritative; R2 key derived from this
+  mimeType: z.string(),
+  originalFilename: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+  uploadedAt: IsoDate,
+  uploadedBy: PartyId.optional(),
+  jobId: JobId.optional(),                          // some docs are project-scoped (insurance, architect set)
+  tags: z.array(z.string()).default([]),            // free-form v1; seed: "invoice","plan","contract","receipt","photo","lien_waiver"
+  // invariants:
+  //   - id = "doc_" + sha256 (content-addressed; identical bytes → same Document row)
+  //   - R2 object key = "documents/" + sha256 (derived, not stored on the row)
+  //   - Document rows are permanent audit records. R2 object may be GC'd later
+  //     under a retention policy (not v1).
+  //   - No versioning in v1. A corrected re-send is a new sha256 → new row;
+  //     `supersedes: DocumentId` linkage is deferred.
+});
+
 // --- Cost: append-only money event --------------------------------------
 
 export const CostSource = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("invoice"),   invoiceNumber: z.string(),
-             receivedOn: IsoDay, documentRef: z.string().optional() }),
-  z.object({ kind: z.literal("direct"),    note: z.string().optional() }),  // petty cash, direct buy
-  z.object({ kind: z.literal("tm"),        hours: z.number().optional() }), // time & materials
+             receivedOn: IsoDay, documentId: DocumentId.optional() }),
+  z.object({ kind: z.literal("direct"),    note: z.string().optional(),
+             documentId: DocumentId.optional() }),  // petty cash, direct buy; receipt photo optional
+  z.object({ kind: z.literal("tm"),        hours: z.number().optional(),
+             documentId: DocumentId.optional() }), // time & materials
   z.object({ kind: z.literal("adjustment"),reason: z.string() }),           // true-up
 ]);
 
@@ -435,6 +459,8 @@ Mirroring and restating the locked decisions that shaped this spec:
 - **Scope is the tech spec.** Materials (SKUs) and install notes live on the scope, not on commitments. Nested per-job tree.
 - **Activity is server-level taxonomy.** Shared across jobs and projects.
 - **Patches are content-addressed groups of commitment edits.** Commitment state = fold(patches). Costs are not patched.
+- **Documents are content-addressed and first-class.** Ingested files (invoices, plans, lien waivers, photos) get a `Document` row keyed by sha256. Identical bytes dedupe. Documents may be job-scoped or project-scoped.
+- **`apply_patch` is the sole commitment mutation API.** No `create_commitment` sugar verb. See [TOOLS.md §3.2](TOOLS.md). Reasoning: single mutation path is easier to reason about, test, and extend.
 - **Projects are thin in v1.** `{ id, name, slug }`. Commitments live on jobs, not projects. Contract roll-down from project → job is deferred.
 - **Plans + Options deferred.** Schema has slots (`spec.planRef`, `spec.optionRef`) but no UI.
 

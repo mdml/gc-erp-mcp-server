@@ -12,11 +12,12 @@ How our docs are organized and when to update each. Each subdirectory has its ow
 | [`docs/spikes/`](#spikes) | Active time-boxed investigations | Ephemeral working docs — never permanent | Created and deleted as investigations run |
 | [`docs/intent-agents.md`](intent-agents.md) | Scratch: evaluating Intent as a workflow alternative | Notes toward a decision | Ad hoc |
 
-Two files that are *not* under `docs/` but are part of the doc landscape:
+Three files that are *not* under `docs/` but are part of the doc landscape:
 
 | File | What | Why it's at repo root |
 |---|---|---|
 | [`SPEC.md`](../SPEC.md) | Data model (Zod schemas), job walkthrough, open questions | First thing anyone reading the repo looks at; stays at the top |
+| [`TOOLS.md`](../TOOLS.md) | MCP tool + app contract — verb surface companion to SPEC's type surface | Contract doc like SPEC; referenced by both product and engineering |
 | [`README.md`](../README.md) | Onboarding + deploy | Standard repo convention |
 
 ## When to create or update each type

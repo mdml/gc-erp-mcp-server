@@ -30,12 +30,12 @@ For what the system *represents* — data model, job walkthrough, open questions
                                                              │  │  - SQLite storage*   │  │
                                                              │  └──────────────────────┘  │
                                                              └────────────────────────────┘
-                                                              * empty at v1; job state lands later
+                                                              * MCP-session runtime only; domain state in D1 (ADR 0003)
 ```
 
 - **Product:** the MCP server itself. Distribution is a hosted URL plus a bearer token (not a published npm package).
 - **Transport:** streamable HTTP, per the MCP spec. Stdio is out of scope — the server has to be reachable from phones.
-- **Session model:** Cloudflare `agents/McpAgent` backs each MCP session with its own Durable Object instance. The DO's SQLite is where job/commitment/cost state will eventually live.
+- **Session model:** Cloudflare `agents/McpAgent` backs each MCP session with its own Durable Object instance. The DO holds MCP-session runtime state only (transport, subscriptions, OAuth-in-future). Domain state — jobs, commitments, costs, documents — lives in D1 and R2. See [ADR 0003](../decisions/0003-storage-split.md).
 
 ---
 
@@ -103,7 +103,7 @@ A single HTTP request from a client:
 5. **MCP server dispatch.** Inside the DO, a `McpServer` (from `@modelcontextprotocol/sdk`) receives the JSON-RPC message and dispatches to tool handlers registered in `GcErpMcp.init()`. At v1: `ping` and `list_jobs`.
 6. **Response.** Streamable HTTP carries the JSON-RPC response (and any SSE frames for streaming tools) back to the client.
 
-**Stateless for now; DO-stateful later.** v1's tools don't touch DO storage — `ping` returns wall clock, `list_jobs` returns `[]`. When the data model lands, commitments/costs/events will live in the DO's SQLite. One natural extension: *one DO per Job*, keyed by Job ID — state colocated with compute, naturally partitioned, per-job isolation.
+**Stateless for now; D1-stateful later.** v1's tools don't touch any storage — `ping` returns wall clock, `list_jobs` returns `[]`. When the data model lands, commitments/costs/events will live in D1 (domain state) and document blobs in R2 (content-addressed by sha256). The DO's SQLite stays reserved for MCP-session-runtime bookkeeping that `agents/McpAgent` owns. See [ADR 0003](../decisions/0003-storage-split.md) for the reasoning.
 
 ---
 
@@ -265,7 +265,7 @@ Fast local checks fail loudly at the moment of authorship. Expensive checks move
 Pointers into the roadmap — things the architecture has slots for but doesn't yet use.
 
 - **Data model & tools** — see [SPEC.md §1](../../SPEC.md) for the Zod schemas and [§2](../../SPEC.md) for the kitchen-remodel walkthrough. Implementation lands in the M1–M2 milestones (see [docs/product/milestones.md](../product/milestones.md)).
-- **Durable Object storage** — the `GcErpMcp` DO class is declared and bound in `wrangler.jsonc`; SQLite is the intended home for job-scoped state. No tables yet.
+- **D1 + R2 provisioning** — [ADR 0003](../decisions/0003-storage-split.md) locks D1 as the home for domain state and R2 for document blobs. Providers in `packages/infra/` and the `packages/database` package with drizzle schema + migrations land in M1. The `GcErpMcp` DO's SQLite remains reserved for MCP-session-runtime state (owned by `agents/McpAgent`).
 - **MCP apps (UI components)** — [MCP Apps extension spec](https://modelcontextprotocol.io/extensions/apps/overview). First app targeted at M3 (cost-entry form).
 - **Pay-app PDF generation** — M5. Renders G702/G703 from a job's commitment + cost state. Likely a separate `packages/pay-app/` or an inline module on mcp-server.
 - **Integrations** — email ingestion for invoices, QuickBooks push, lien-waiver tracking. Milestone-dependent.

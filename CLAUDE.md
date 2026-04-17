@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-erp-mcp-server
 
-> Quick links: [README](README.md) · [SPEC](SPEC.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/)
+> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/)
 
 ## Project overview
 
