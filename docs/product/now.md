@@ -6,13 +6,14 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Up next
 
-1. **`apply_patch` + `issue_ntp` + `get_scope_tree` — the Day 3 / Day 10 wave.** Spike resolved; four ADRs landed ([0005](../decisions/0005-activations-carry-scopeid.md), [0006](../decisions/0006-void-commitment-semantics.md), [0007](../decisions/0007-ntp-derivation-from-current-activation.md), [0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md)). `apply_patch` is the biggest — D1 batch atomicity per ADR 0008. Then `issue_ntp` (thin — no patch). Then `get_scope_tree` with subtree rollups per ADR 0005. Day 3 in `kitchen.ts` wires create + apply_patch + get_scope_tree and asserts `Demo.committed = $1,500`, `Framing.committed = $7,000`.
-2. **`record_cost` + `record_direct_cost` — Day 14 / Day 18.** Blocked on (1). `record_cost` ties a cost to an activation + commitment + scope; `record_direct_cost` atomically creates a self-commitment via `apply_patch` + the cost.
-3. **Day 60 change-order scenario** in `kitchen.ts`. Validates `addActivation` + `setPrice` in one patch; parity check (fold patches → commitments table) lands alongside as a scenario-runner assertion per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) §F3.2.
+1. **`issue_ntp` — Day 10 (thin).** Single INSERT into `ntp_events`; derived `startBy`/`finishBy` from current activation per [ADR 0007](../decisions/0007-ntp-derivation-from-current-activation.md). Reject NTPs targeting activations on voided commitments per [ADR 0006](../decisions/0006-void-commitment-semantics.md) (voidedness now a column read per [ADR 0009](../decisions/0009-void-state-projected-on-commitments.md)).
+2. **`get_scope_tree` + Day 3 / Day 10 wiring.** Subtree rollups per [ADR 0005](../decisions/0005-activations-carry-scopeid.md); filter voided commitments via `WHERE voided_at IS NULL` (ADR 0009). Wire Day 3 + Day 10 into `kitchen.ts`; assert `Demo.committed = $1,500`, `Framing.committed = $7,000`, `startBy 2026-05-04` / `finishBy 2026-05-05`.
+3. **`record_cost` + `record_direct_cost` — Day 14 / Day 18.** Blocked on (1) + (2). `record_cost` ties a cost to an activation + commitment + scope; `record_direct_cost` atomically creates a self-commitment via `apply_patch` + the cost.
+4. **Day 60 change-order scenario** in `kitchen.ts`. Validates `addActivation` + `setPrice` in one patch; parity check (fold patches → commitments table) lands alongside as a scenario-runner assertion per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) §F3.2.
 
 ## In flight
 
-*(nothing yet)*
+- **`apply_patch`** — on `slice/m2-apply-patch`. ADR 0008 batch flow, six `CommitmentEdit` ops, post-fold invariants, 19 tests (Layer 1). Voidedness projected via `commitments.voided_at` + `voided_reason` ([ADR 0009](../decisions/0009-void-state-projected-on-commitments.md), migration `0002_quick_kylun.sql`). Handler-layer gates cover cross-job scopes, voided-commitment edits, F1.3 NTP-blocks-remove, and parent-patch jobId match. `kitchen.ts` wiring deferred to the `get_scope_tree` slice. PR open to `main`.
 
 ## Waiting on
 

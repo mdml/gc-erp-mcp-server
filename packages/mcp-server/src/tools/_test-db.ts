@@ -23,8 +23,28 @@ export function createTestDb(): DatabaseClient {
   migrate(db, {
     migrationsFolder: "../database/src/migrations",
   });
-  // drizzle-d1 and drizzle-better-sqlite3 share the same query-builder
-  // surface; the cast lets handlers type against DatabaseClient (the runtime
-  // type) while tests feed in the sync sqlite variant.
+
+  // drizzle-d1 exposes `.batch([...])` with all-or-nothing semantics; the
+  // better-sqlite3 adapter does not. `apply_patch` and any future tool that
+  // relies on batched atomicity per ADR 0008 needs the method on the test
+  // client too. Polyfill it using a native better-sqlite3 BEGIN/COMMIT —
+  // all queries in the same SQLite connection run inside the transaction,
+  // so the existing thenable query builders fold in without rebuilding.
+  const anyDb = db as unknown as {
+    batch: (queries: readonly unknown[]) => Promise<unknown[]>;
+  };
+  anyDb.batch = async (queries) => {
+    sqlite.exec("BEGIN");
+    try {
+      const results: unknown[] = [];
+      for (const q of queries) results.push(await (q as Promise<unknown>));
+      sqlite.exec("COMMIT");
+      return results;
+    } catch (err) {
+      sqlite.exec("ROLLBACK");
+      throw err;
+    }
+  };
+
   return db as unknown as DatabaseClient;
 }
