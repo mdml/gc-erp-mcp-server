@@ -56,6 +56,10 @@ export async function planD1(config: InfraConfig): Promise<D1Action> {
 
 export async function applyD1(action: D1Action): Promise<void> {
   if (action.kind === "noop") return;
+  // NOTE: Overwrites d1_databases as a single-entry array. If infra.config.ts ever
+  // holds >1 D1 spec, change patchWranglerJsonc here to merge-append, not replace.
+  // NOTE: Partial-failure — if POST succeeds but patchWranglerJsonc throws, the DB
+  // exists in CF with no binding in wrangler.jsonc. Fix: add it manually, or teardown + re-apply.
   const db = await cf<D1Database>("POST", accountPath("/d1/database"), {
     name: action.databaseName,
   });
