@@ -50,7 +50,7 @@ Every tool listed here gets a Zod `inputSchema` referencing SPEC.md §1 types (e
 | Tool | Inputs | Output | Notes |
 |---|---|---|---|
 | `apply_patch` | `{ jobId, parentPatchId?, message, edits: CommitmentEdit[] }` | `Patch` | **The only commitment mutation API.** Create, price-change, activation add/edit/remove, void — all via `edits`. Atomic apply or error. Content-addressed id. |
-| `issue_ntp` | `{ activationId, issuedOn, siteReady, note? }` | `NTPEvent` (+ derived `startBy`, `finishBy`) | Multiple NTPs per activation allowed; latest wins. Not a Patch — NTP is event-log separate from commitment state. |
+| `issue_ntp` | `{ activationId, issuedOn, note? }` | `NTPEvent` (+ derived `startBy`, `finishBy`) | Multiple NTPs per activation allowed; latest wins. Not a Patch — NTP is event-log separate from commitment state. `startBy`/`finishBy` recompute from current activation state on read ([ADR 0007](docs/decisions/0007-ntp-derivation-from-current-activation.md)). |
 
 **No sugar verbs for commitments.** An earlier draft proposed `create_commitment` as syntactic sugar wrapping a single-edit Patch. Rejected in favor of a uniform power-tool surface: every commitment mutation is an `apply_patch` call with one or more `CommitmentEdit` entries. Reasoning: (a) single mutation path is easier to reason about and test; (b) one commitment-edit API is easier for Claude to master than five sugar tools; (c) as models improve, composing `edits` arrays is trivially in-scope.
 
@@ -177,9 +177,9 @@ apply_patch({
       counterpartyId: party_rogelio,
       price: { kind: "lump", total: { cents: 850_000, currency: "USD" } },
       activations: [
-        { id: a_drop,  activityId: act_lumberDrop, pricePortion: { cents:  50_000 }, leadTime: { days: 5 }, buildTime: { days: 1 } },
-        { id: a_frame, activityId: act_frame,      pricePortion: { cents: 700_000 }, leadTime: { days: 3 }, buildTime: { days: 3 } },
-        { id: a_punch, activityId: act_punch,      pricePortion: { cents: 100_000 }, leadTime: { days: 0 }, buildTime: { days: 1 } },
+        { id: a_drop,  activityId: act_lumberDrop, scopeId: s_demo,    pricePortion: { cents:  50_000 }, leadTime: { days: 5 }, buildTime: { days: 1 } },
+        { id: a_frame, activityId: act_frame,      scopeId: s_framing, pricePortion: { cents: 700_000 }, leadTime: { days: 3 }, buildTime: { days: 3 } },
+        { id: a_punch, activityId: act_punch,      scopeId: s_demo,    pricePortion: { cents: 100_000 }, leadTime: { days: 0 }, buildTime: { days: 1 } },
       ],
       signedOn: "2026-04-18",
     },
@@ -195,7 +195,7 @@ Assertions:
 ### Day 10 — NTP
 
 ```
-issue_ntp({ activationId: a_drop, issuedOn: "2026-04-27", siteReady: true })
+issue_ntp({ activationId: a_drop, issuedOn: "2026-04-27" })
   → NTPEvent { id: n1, startBy: "2026-05-04", finishBy: "2026-05-05" }
 ```
 
@@ -253,7 +253,7 @@ apply_patch({
   message: "CO #1: add pantry",
   edits: [
     { op: "addActivation", commitmentId: c_frame,
-      activation: { activityId: act_frame, pricePortion: { cents: 90_000 }, leadTime: { days: 2 }, buildTime: { days: 1 } } },
+      activation: { activityId: act_frame, scopeId: s_framing, pricePortion: { cents: 90_000 }, leadTime: { days: 2 }, buildTime: { days: 1 } } },
     { op: "setPrice", commitmentId: c_cabinets, price: { kind: "lump", total: { cents: 1_420_000 } } },
   ],
 })
@@ -310,6 +310,10 @@ Kept as a trail of reasoning; the substance has moved into the relevant section.
 4. **Starter activity library** — seeded on first boot; 22-item list in §7 is the v1 seed. Adjustable by editing the seed module before first boot; after first boot, additions happen via `ensure_activity`.
 5. **Starter activity library (and schema + migrations) location** — `packages/database` (not `dev-tools`). See §10.
 6. **MCP App upload fallback** — deferred. Primary clients (Claude Desktop, web, mobile) support apps; CLI-only operators fall back to inline `store_document` within payload size limits.
+7. **Activation carries `scopeId`** — required field; rollup is `scope.committed = sum(activation.pricePortion WHERE activation.scopeId ∈ subtree(scope))`. [ADR 0005](docs/decisions/0005-activations-carry-scopeid.md).
+8. **Void commitment semantics** — excluded from `committed` rollups; NTPs and already-recorded costs preserved. [ADR 0006](docs/decisions/0006-void-commitment-semantics.md).
+9. **NTP derivation recomputes from current activation** — lead/build-time edits move the schedule; void+recreate is the escape hatch for freezing dates. `siteReady` dropped, folds into future `DelayEvent` (backlog). [ADR 0007](docs/decisions/0007-ntp-derivation-from-current-activation.md).
+10. **`apply_patch` atomicity via D1 batch** — one transaction per patch, invariants checked post-fold. [ADR 0008](docs/decisions/0008-apply-patch-atomicity-via-d1-batch.md).
 
 ---
 

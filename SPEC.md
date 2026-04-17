@@ -132,6 +132,7 @@ export const PriceKind = z.discriminatedUnion("kind", [
 export const Activation = z.object({
   id: ActivationId,
   activityId: ActivityId,
+  scopeId: ScopeId,                 // where this price portion attributes
   // Schedule-of-values portion of the commitment's total price.
   // For lump: a dollar portion. For unit: an estimated-units portion.
   pricePortion: Money,
@@ -146,12 +147,16 @@ export const Activation = z.object({
   //   - belongs to exactly one Commitment (parent-owned, not standalone)
   //   - NTP fires per Activation (not per Commitment)
   //   - finishBy = NTP.issuedOn + leadTime + buildTime (working days)
+  //   - scopeId ∈ parent Commitment.scopeIds (see ADR 0005)
+  //   - rollup: scope.committed = sum(activation.pricePortion WHERE
+  //     activation.scopeId ∈ subtree(scope))
 });
 
 export const Commitment = z.object({
   id: CommitmentId,
   jobId: JobId,                     // commitments live on jobs, not projects
-  scopeIds: z.array(ScopeId).min(1),// usually 1; >1 for "whole house paint"
+  scopeIds: z.array(ScopeId).min(1),// declared coverage; activations attribute
+                                    // their pricePortion to one of these scopes
   counterpartyId: PartyId,          // the sub
   price: PriceKind,
   activations: z.array(Activation).min(1),
@@ -162,6 +167,7 @@ export const Commitment = z.object({
   //   - sum(activation.pricePortion) == price.total (for lump)
   //     or == price.perUnit * price.estimatedUnits (for unit)
   //   - a Commitment with one Activation is the common "simple" case
+  //   - every activation.scopeId ∈ this.scopeIds (ADR 0005)
 });
 
 // --- Notice to Proceed: first-class event --------------------------------
@@ -170,16 +176,18 @@ export const NTPEvent = z.object({
   id: NTPEventId,
   activationId: ActivationId,       // points at activation, not commitment
   issuedOn: IsoDay,
-  siteReady: z.boolean(),           // operator asserts site-ready at issue
   note: z.string().optional(),
   // DERIVED (not stored):
-  //   startBy  = issuedOn + activation.leadTime
-  //   finishBy = startBy  + activation.buildTime
-  //   variance = actualFinish - finishBy   (computed once activation closes)
+  //   startBy  = issuedOn + activation.leadTime           (ADR 0007: current
+  //   finishBy = startBy  + activation.buildTime            activation, not
+  //   variance = actualFinish - finishBy   (computed once    frozen at issue)
+  //                                         activation closes)
   // invariants:
   //   - multiple NTPs allowed per activation (re-issue after delay);
   //     the latest one is authoritative for schedule
   //   - cannot be mutated; issue a new NTPEvent to re-NTP
+  //   - no `siteReady` flag: the site-blocked-on-arrival case is tracked
+  //     via a future DelayEvent (see backlog.md). See ADR 0007.
 });
 
 // --- Document: content-addressed blob metadata --------------------------
@@ -242,10 +250,16 @@ export const CommitmentEdit = z.discriminatedUnion("op", [
   z.object({ op: z.literal("setPrice"),    commitmentId: CommitmentId, price: PriceKind }),
   z.object({ op: z.literal("addActivation"), commitmentId: CommitmentId, activation: Activation }),
   z.object({ op: z.literal("setActivation"), commitmentId: CommitmentId, activationId: ActivationId,
-             fields: Activation.partial() }),
+             fields: Activation.omit({ id: true, activityId: true }).partial() }),
   z.object({ op: z.literal("removeActivation"), commitmentId: CommitmentId, activationId: ActivationId }),
   z.object({ op: z.literal("void"),        commitmentId: CommitmentId, reason: z.string() }),
-  // invariant: no op edits a Cost. Costs are append-only; they are not patched.
+  // invariants:
+  //   - no op edits a Cost. Costs are append-only; they are not patched.
+  //   - no setScopes/setCounterparty/setSignedOn ops — changing identity
+  //     fields of a commitment is void + re-create (ADR 0006).
+  //   - setActivation omits activityId — renaming kind-of-work retroactively
+  //     rewrites history; force remove+add. See packages/database/src/schema/patches.ts.
+  //   - invariants are checked post-fold per patch (ADR 0008), not per-edit.
 ]);
 
 export const Patch = z.object({
@@ -315,13 +329,13 @@ In Claude I say "create a framing commitment with Rogelio for $8,500 lump, cover
 ```
 Commitment c_frame {
   jobId: j_kitchen,
-  scopeIds: [s_demo, s_framing],    // covers both
+  scopeIds: [s_demo, s_framing],    // declared coverage
   counterpartyId: party_rogelio,
   price: { kind: "lump", total: $8,500 },
   activations: [
-    { id: a_drop,  activityId: act_lumberDrop, pricePortion: $500,   leadTime: 5d, buildTime: 1d },
-    { id: a_frame, activityId: act_frame,      pricePortion: $7,000, leadTime: 3d, buildTime: 3d },
-    { id: a_punch, activityId: act_punch,      pricePortion: $1,000, leadTime: 0d, buildTime: 1d },
+    { id: a_drop,  activityId: act_lumberDrop, scopeId: s_demo,    pricePortion: $500,   leadTime: 5d, buildTime: 1d },
+    { id: a_frame, activityId: act_frame,      scopeId: s_framing, pricePortion: $7,000, leadTime: 3d, buildTime: 3d },
+    { id: a_punch, activityId: act_punch,      scopeId: s_demo,    pricePortion: $1,000, leadTime: 0d, buildTime: 1d },
   ],
   signedOn: 2026-04-18,
 }
@@ -344,7 +358,7 @@ Dashboard now: `Kitchen > Framing` shows committed $7,000, `Kitchen > Demo` show
 
 Rogelio calls: he can drop lumber Monday. I confirm the site is clear. I say "NTP the lumber drop for Monday."
 
-`ntp.issue({ activationId: a_drop, issuedOn: 2026-04-27, siteReady: true })` → creates `NTPEvent n1`. Derived: `startBy = 2026-05-04` (5 working days lead), `finishBy = 2026-05-05`.
+`ntp.issue({ activationId: a_drop, issuedOn: 2026-04-27 })` → creates `NTPEvent n1`. Derived: `startBy = 2026-05-04` (5 working days lead), `finishBy = 2026-05-05`.
 
 Dashboard: `Kitchen > Framing > lumber drop` shows "NTP issued 4/27, start-by 5/4, finish-by 5/5". No variance yet — the activation isn't closed.
 

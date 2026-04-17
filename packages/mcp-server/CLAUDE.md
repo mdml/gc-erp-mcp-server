@@ -31,6 +31,7 @@ See [docs/guides/ARCHITECTURE.md §3](../../docs/guides/ARCHITECTURE.md) for the
 - **Durable Object class is `GcErpMcp`.** The `MCP_OBJECT` binding in `wrangler.jsonc` points at this class, and migration `v1` creates it as a SQLite-backed DO. If you rename the class or remove it, that's a migration boundary — add a new `migrations` entry, don't edit `v1`.
 - **The DO's SQLite is for MCP-session runtime only** (transport buffers, session identity, subscriptions, hibernatable connections — owned by `agents/McpAgent`). Domain state — jobs, commitments, costs, patches, document metadata — lives in D1; document blobs in R2. Per [ADR 0003](../../docs/decisions/0003-storage-split.md). Adding a table to DO SQLite for domain use is a design bug.
 - **Compatibility date is pinned.** Changes to `wrangler.jsonc` `compatibility_date` are deliberate. Worker APIs evolve; advancing the date is an intentional upgrade, not a bump-for-bumping.
+- **Multi-table writes go through D1 batched statements.** Any tool that mutates more than one D1 row per call (`apply_patch` being the canonical example) must assemble all statements into a single `db.batch([...])` call so the whole patch is one atomic transaction. Hand-rolled multi-statement writes are a correctness bug — partial projection state breaks the "current state = fold(patches)" audit invariant. See [ADR 0008](../../docs/decisions/0008-apply-patch-atomicity-via-d1-batch.md).
 
 ## Testing
 
