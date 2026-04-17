@@ -20,6 +20,8 @@ const cfMock = vi.mocked(client.cf);
 const cfg: InfraConfig = {
   worker: { name: "gc-erp-mcp-server" },
   customDomain: { hostname: "gc.leiserson.me", zone: "leiserson.me" },
+  d1: { databaseName: "gc-erp" },
+  r2: { bucketName: "gc-erp-documents" },
 };
 
 function domain(overrides: Partial<WorkerDomain> = {}): WorkerDomain {
