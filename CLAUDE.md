@@ -11,6 +11,7 @@ For the product pitch → [docs/product/overview.md](docs/product/overview.md). 
 ## Repo shape
 
 - `packages/mcp-server/` — Cloudflare Worker (the runtime; ships to production)
+- `packages/database/` — SPEC §1 data layer: Zod + Drizzle schemas, migrations, seeds, typed D1 client; imported by mcp-server
 - `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, sync-secrets); never shipped
 - `packages/infra/` — internal CLI for *remote* Cloudflare provisioning (custom domain, [later] D1/R2/secrets); never shipped
 - `packages/agent-config/` — single source of truth for Claude Code permissions; installs `.claude/settings.json` via `bun install`
@@ -142,6 +143,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **"I want to know how it's *built*."** → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md).
 - **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
 - **"I want to change a tool's response."** → [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
+- **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/CLAUDE.md) → `src/schema/<entity>.ts`.
 - **"I want to add a new secret."** → [packages/dev-tools/CLAUDE.md](packages/dev-tools/CLAUDE.md) → `src/secrets.config.ts`.
 - **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.
 - **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/CLAUDE.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.

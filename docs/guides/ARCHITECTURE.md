@@ -41,7 +41,7 @@ For what the system *represents* — data model, job walkthrough, open questions
 
 ## 2. Repo layout
 
-Turbo-managed bun workspace. Two packages at v1:
+Turbo-managed bun workspace. Four packages at v1:
 
 ```
 .
@@ -78,11 +78,19 @@ Turbo-managed bun workspace. Two packages at v1:
     │   ├── src/secrets.config.ts    #   declarative list of required secrets
     │   ├── src/gate/                #   gate runner (typecheck, lint, test, code health)
     │   └── src/*.test.ts
-    └── infra/                       # internal CLI for REMOTE Cloudflare state — never bundled
-        ├── src/infra.config.ts      #   declarative desired state (worker, custom domain, …)
-        ├── src/lib/                 #   sole boundary: cloudflare-client (fetch), wrangler-adapter (Bun.spawn)
-        ├── src/providers/           #   one file per resource kind (custom-domain, d1, r2; secrets next)
-        └── src/{status,apply,teardown}.ts  # command entries (bun run infra:status etc.)
+    ├── infra/                       # internal CLI for REMOTE Cloudflare state — never bundled
+    │   ├── src/infra.config.ts      #   declarative desired state (worker, custom domain, …)
+    │   ├── src/lib/                 #   sole boundary: cloudflare-client (fetch), wrangler-adapter (Bun.spawn)
+    │   ├── src/providers/           #   one file per resource kind (custom-domain, d1, r2; secrets next)
+    │   └── src/{status,apply,teardown}.ts  # command entries (bun run infra:status etc.)
+    └── database/                    # data layer — SPEC.md §1 port; imported by mcp-server
+        ├── src/schema/              #   drizzle tables + Zod domain types (runtime)
+        ├── src/ids/                 #   `{prefix}_{nanoid21}` generators (runtime)
+        ├── src/invariants/          #   pure validators for constraints SQL can't express
+        ├── src/patches/hash.ts      #   content-addressed pat_<sha256> (runtime)
+        ├── src/client.ts            #   typed drizzle-D1 client factory (runtime)
+        ├── src/migrations/          #   drizzle-kit output SQL (tooling — applied by wrangler)
+        └── src/seed/                #   activity-library seeder + data (tooling)
 ```
 
 **Why this split.** `mcp-server` is code shipped to production; `dev-tools` is machinery that makes the monorepo habitable. Keeping them separate means `mcp-server`'s bundle stays small and its deps stay relevant to what's actually deployed.
@@ -247,7 +255,9 @@ Fast local checks fail loudly at the moment of authorship. Expensive checks move
 | **Turbo**           | task graph + cache     | zero-config incremental across packages, caches test/lint results            |
 | **Wrangler**        | Cloudflare CLI         | the only way to ship to Workers                                              |
 | **agents/McpAgent** | MCP server runtime     | handles streamable HTTP transport + session-scoped DOs; built on MCP TS SDK  |
-| **Zod v4**          | schema validation      | required by `agents@0.11`; will hold SPEC.md types once implemented          |
+| **Zod v4**          | schema validation      | required by `agents@0.11`; holds SPEC.md types in `packages/database/src/schema/` |
+| **Drizzle ORM**     | D1 schema + queries    | one source of truth — drizzle-kit generates migrations, Worker runs typed queries, seeds share the same schema |
+| **nanoid**          | ID generation          | 21-char URL-safe suffix behind entity prefix (`job_`, `scope_`, …); content-addressed `doc_<sha256>` / `pat_<sha256>` are separate |
 | **Biome**           | lint + format          | one tool instead of eslint + prettier; fast                                  |
 | **Vitest**          | tests + coverage       | bun-compatible; v8 coverage provider for line thresholds                     |
 | **Commitlint**      | commit-msg enforcement | conventional commits discipline                                              |
@@ -264,8 +274,8 @@ Fast local checks fail loudly at the moment of authorship. Expensive checks move
 
 Pointers into the roadmap — things the architecture has slots for but doesn't yet use.
 
-- **Data model & tools** — see [SPEC.md §1](../../SPEC.md) for the Zod schemas and [§2](../../SPEC.md) for the kitchen-remodel walkthrough. Implementation lands in the M1–M2 milestones (see [docs/product/milestones.md](../product/milestones.md)).
-- **D1 + R2 provisioning** — [ADR 0003](../decisions/0003-storage-split.md) locks D1 as the home for domain state and R2 for document blobs. Providers in `packages/infra/` and the `packages/database` package with drizzle schema + migrations land in M1. The `GcErpMcp` DO's SQLite remains reserved for MCP-session-runtime state (owned by `agents/McpAgent`).
+- **Tools surface** — SPEC.md §1 Zod types are ported in `packages/database` (M1). Tool handlers that consume them (`create_job`, `list_jobs` real, `ensure_activity`, `apply_patch`, `record_cost`, …) land in `packages/mcp-server/src/tools/` through M1–M2; verbs + scenarios in [TOOLS.md](../../TOOLS.md).
+- **D1 + R2 provisioning** — [ADR 0003](../decisions/0003-storage-split.md) locks D1 as the home for domain state and R2 for document blobs. The `packages/database` package owns schema, migrations, and seeds; the D1/R2 providers in `packages/infra/` land alongside (M1). The `GcErpMcp` DO's SQLite remains reserved for MCP-session-runtime state (owned by `agents/McpAgent`).
 - **MCP apps (UI components)** — [MCP Apps extension spec](https://modelcontextprotocol.io/extensions/apps/overview). First app targeted at M3 (cost-entry form).
 - **Pay-app PDF generation** — M5. Renders G702/G703 from a job's commitment + cost state. Likely a separate `packages/pay-app/` or an inline module on mcp-server.
 - **Integrations** — email ingestion for invoices, QuickBooks push, lien-waiver tracking. Milestone-dependent.
@@ -282,6 +292,7 @@ Concrete starting points by task:
 - **"I want to run it locally."** → [README.md](../../README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](../../SPEC.md) → Narrative walkthrough.
 - **"I want to change what a tool returns."** → `packages/mcp-server/src/index.ts` → `GcErpMcp.init()`.
+- **"I want to change the data model."** → [SPEC.md §1](../../SPEC.md) → `packages/database/src/schema/` (Zod + drizzle colocated per entity).
 - **"I want to add a new secret."** → `packages/dev-tools/src/secrets.config.ts`; add to 1Password vault; `turbo run sync-secrets`.
 - **"I want to add a new quality check."** → `packages/dev-tools/src/gate/checks.ts` and/or `lefthook.yml`.
 - **"The gate is failing and I don't know why."** → `bun run gate` at the repo root prints the output directly; per-check exit codes indicate the failure.
