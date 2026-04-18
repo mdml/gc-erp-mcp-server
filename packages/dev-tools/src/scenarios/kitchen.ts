@@ -11,6 +11,7 @@
  * (`apply_patch`, `issue_ntp`, `record_cost`, `record_direct_cost`).
  */
 
+import { newActivationId, newCommitmentId } from "@gc-erp/database/ids";
 import { assertEqual, assertTrue } from "./assert";
 import type { ScenarioClient } from "./client";
 
@@ -30,7 +31,8 @@ const CHILD_SCOPE_NAMES = [
 
 export async function runKitchen(ctx: ScenarioContext): Promise<void> {
   await day0(ctx);
-  // await day3(ctx); await day10(ctx); …
+  await day3(ctx);
+  // await day10(ctx); — depends on issue_ntp landing (Prompt 2)
 }
 
 async function day0(ctx: ScenarioContext): Promise<void> {
@@ -141,4 +143,215 @@ async function verifyScopeTree(
     "all non-root scopes hang off Kitchen",
   );
   ctx.log(`  ✓ list_scopes   → ${scopes.length} scopes, tree shape verified`);
+}
+
+// ---------------------------------------------------------------------------
+// Day 3 — first commitment (TOOLS.md §6 Day 3)
+// ---------------------------------------------------------------------------
+
+interface ScopeNodeLike {
+  id: string;
+  committed: { cents: number; currency: string };
+  cost: { cents: number; currency: string };
+  variance: { cents: number; currency: string };
+  children: ScopeNodeLike[];
+}
+
+function findTreeNodeOrNull(
+  tree: ScopeNodeLike[],
+  id: string,
+): ScopeNodeLike | null {
+  for (const node of tree) {
+    if (node.id === id) return node;
+    const found = findTreeNodeOrNull(node.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findTreeNode(tree: ScopeNodeLike[], id: string): ScopeNodeLike {
+  const node = findTreeNodeOrNull(tree, id);
+  if (!node) throw new Error(`scope ${id} not found in scope tree`);
+  return node;
+}
+
+async function day3(ctx: ScenarioContext): Promise<void> {
+  ctx.log("── Day 3 — first commitment (Rogelio framing contract)");
+  const jobId = ctx.state.jobId as string;
+
+  const scopeIds = await lookupScopeIdsByName(ctx, jobId);
+  const partyRogelioId = await createRogelioParty(ctx);
+  const actIds = await ensureFramingActivities(ctx);
+
+  const cFrameId = newCommitmentId();
+  const aDropId = newActivationId();
+  const aFrameId = newActivationId();
+  const aPunchId = newActivationId();
+
+  await applyFramingCommitment(ctx, {
+    jobId,
+    cFrameId,
+    aDropId,
+    aFrameId,
+    aPunchId,
+    partyRogelioId,
+    actIds,
+    scopeIds,
+  });
+
+  await verifyDay3ScopeTree(ctx, jobId, scopeIds);
+
+  ctx.state.partyRogelioId = partyRogelioId;
+  ctx.state.cFrameId = cFrameId;
+  ctx.state.aDropId = aDropId;
+  ctx.state.aFrameId = aFrameId;
+  ctx.state.aPunchId = aPunchId;
+}
+
+async function lookupScopeIdsByName(
+  ctx: ScenarioContext,
+  jobId: string,
+): Promise<{ demo: string; framing: string; kitchen: string }> {
+  const { scopes } = await ctx.client.call<{
+    scopes: Array<{ id: string; name: string }>;
+  }>("list_scopes", { jobId });
+
+  const find = (name: string): string => {
+    const s = scopes.find((scope) => scope.name === name);
+    assertTrue(s !== undefined, `${name} scope exists`);
+    return (s as { id: string }).id;
+  };
+
+  return {
+    demo: find("Demo"),
+    framing: find("Framing"),
+    kitchen: find("Kitchen"),
+  };
+}
+
+async function createRogelioParty(ctx: ScenarioContext): Promise<string> {
+  const { party } = await ctx.client.call<{
+    party: { id: string; name: string };
+  }>("create_party", { kind: "org", name: "Rogelio's Framing LLC" });
+  assertTrue(
+    party.id.startsWith("party_"),
+    "create_party returned a party_ id",
+  );
+  ctx.log(`  ✓ create_party  → ${party.id} (${party.name})`);
+  return party.id;
+}
+
+async function ensureFramingActivities(
+  ctx: ScenarioContext,
+): Promise<{ lumberDrop: string; frame: string; punch: string }> {
+  const ensure = async (slug: string, name: string): Promise<string> => {
+    const { activity } = await ctx.client.call<{
+      activity: { id: string; slug: string };
+    }>("ensure_activity", { slug, name });
+    ctx.log(`  ✓ ensure_activity → ${activity.id} (${activity.slug})`);
+    return activity.id;
+  };
+
+  return {
+    lumberDrop: await ensure("lumber_drop", "Lumber Drop"),
+    frame: await ensure("frame", "Frame"),
+    punch: await ensure("punch", "Punch List"),
+  };
+}
+
+interface FramingCommitmentArgs {
+  jobId: string;
+  cFrameId: string;
+  aDropId: string;
+  aFrameId: string;
+  aPunchId: string;
+  partyRogelioId: string;
+  actIds: { lumberDrop: string; frame: string; punch: string };
+  scopeIds: { demo: string; framing: string };
+}
+
+async function applyFramingCommitment(
+  ctx: ScenarioContext,
+  args: FramingCommitmentArgs,
+): Promise<void> {
+  const { patch } = await ctx.client.call<{ patch: { id: string } }>(
+    "apply_patch",
+    {
+      jobId: args.jobId,
+      message: "Rogelio framing contract",
+      edits: [
+        {
+          op: "create",
+          commitment: {
+            id: args.cFrameId,
+            jobId: args.jobId,
+            scopeIds: [args.scopeIds.demo, args.scopeIds.framing],
+            counterpartyId: args.partyRogelioId,
+            price: { kind: "lump", total: { cents: 850_000, currency: "USD" } },
+            activations: [
+              {
+                id: args.aDropId,
+                activityId: args.actIds.lumberDrop,
+                scopeId: args.scopeIds.demo,
+                pricePortion: { cents: 50_000, currency: "USD" },
+                leadTime: { days: 5 },
+                buildTime: { days: 1 },
+              },
+              {
+                id: args.aFrameId,
+                activityId: args.actIds.frame,
+                scopeId: args.scopeIds.framing,
+                pricePortion: { cents: 700_000, currency: "USD" },
+                leadTime: { days: 3 },
+                buildTime: { days: 3 },
+              },
+              {
+                id: args.aPunchId,
+                activityId: args.actIds.punch,
+                scopeId: args.scopeIds.demo,
+                pricePortion: { cents: 100_000, currency: "USD" },
+                leadTime: { days: 0 },
+                buildTime: { days: 1 },
+              },
+            ],
+            signedOn: "2026-04-18",
+          },
+        },
+      ],
+    },
+  );
+  ctx.log(`  ✓ apply_patch   → ${patch.id} (c_frame created)`);
+}
+
+async function verifyDay3ScopeTree(
+  ctx: ScenarioContext,
+  jobId: string,
+  scopeIds: { kitchen: string; demo: string; framing: string },
+): Promise<void> {
+  const { tree } = await ctx.client.call<{ tree: ScopeNodeLike[] }>(
+    "get_scope_tree",
+    { jobId },
+  );
+
+  const kitchen = findTreeNode(tree, scopeIds.kitchen);
+  const demo = findTreeNode(tree, scopeIds.demo);
+  const framing = findTreeNode(tree, scopeIds.framing);
+
+  assertEqual(
+    kitchen.committed.cents,
+    850_000,
+    "Kitchen.committed = 850_000 cents",
+  );
+  assertEqual(
+    demo.committed.cents,
+    150_000,
+    "Demo.committed = 150_000 cents (drop + punch)",
+  );
+  assertEqual(
+    framing.committed.cents,
+    700_000,
+    "Framing.committed = 700_000 cents",
+  );
+
+  ctx.log("  ✓ get_scope_tree → Kitchen=$8,500  Demo=$1,500  Framing=$7,000");
 }

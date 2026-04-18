@@ -7,6 +7,7 @@ export * from "./create_party";
 export * from "./create_project";
 export * from "./create_scope";
 export * from "./ensure_activity";
+export * from "./get_scope_tree";
 export * from "./issue_ntp";
 export * from "./list_jobs";
 export * from "./list_scopes";
