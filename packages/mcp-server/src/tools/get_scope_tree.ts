@@ -26,17 +26,20 @@ import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { McpToolDef } from "./_mcp-tool";
 
+type ScopeIdT = z.infer<typeof ScopeId>;
+type MoneyT = z.infer<typeof Money>;
+
 // ---------------------------------------------------------------------------
 // Output types
 // ---------------------------------------------------------------------------
 
 export type ScopeNode = {
-  id: z.infer<typeof ScopeId>;
+  id: ScopeIdT;
   name: string;
-  parentId?: z.infer<typeof ScopeId>;
-  committed: z.infer<typeof Money>;
-  cost: z.infer<typeof Money>;
-  variance: z.infer<typeof Money>;
+  parentId?: ScopeIdT;
+  committed: MoneyT;
+  cost: MoneyT;
+  variance: MoneyT;
   children: ScopeNode[];
 };
 
@@ -64,15 +67,13 @@ export const GetScopeTreeOutput = z.object({ tree: z.array(ScopeNodeSchema) });
 // ---------------------------------------------------------------------------
 
 type ScopeRow = {
-  id: z.infer<typeof ScopeId>;
-  parentId: z.infer<typeof ScopeId> | null;
+  id: ScopeIdT;
+  parentId: ScopeIdT | null;
   name: string;
 };
 
-function buildNodeMap(
-  scopeRows: ScopeRow[],
-): Map<z.infer<typeof ScopeId>, ScopeNode> {
-  const nodeMap = new Map<z.infer<typeof ScopeId>, ScopeNode>();
+function buildNodeMap(scopeRows: ScopeRow[]): Map<ScopeIdT, ScopeNode> {
+  const nodeMap = new Map<ScopeIdT, ScopeNode>();
   for (const row of scopeRows) {
     nodeMap.set(row.id, {
       id: row.id,
@@ -88,9 +89,9 @@ function buildNodeMap(
 }
 
 function accumulateActivations(
-  nodeMap: Map<z.infer<typeof ScopeId>, ScopeNode>,
+  nodeMap: Map<ScopeIdT, ScopeNode>,
   activationRows: Array<{
-    scopeId: z.infer<typeof ScopeId>;
+    scopeId: ScopeIdT;
     pricePortionCents: number;
   }>,
 ): void {
@@ -101,8 +102,8 @@ function accumulateActivations(
 }
 
 function accumulateCosts(
-  nodeMap: Map<z.infer<typeof ScopeId>, ScopeNode>,
-  costRows: Array<{ scopeId: z.infer<typeof ScopeId>; amountCents: number }>,
+  nodeMap: Map<ScopeIdT, ScopeNode>,
+  costRows: Array<{ scopeId: ScopeIdT; amountCents: number }>,
 ): void {
   for (const costRow of costRows) {
     const node = nodeMap.get(costRow.scopeId);
@@ -110,9 +111,7 @@ function accumulateCosts(
   }
 }
 
-function linkAndCollectRoots(
-  nodeMap: Map<z.infer<typeof ScopeId>, ScopeNode>,
-): ScopeNode[] {
+function linkAndCollectRoots(nodeMap: Map<ScopeIdT, ScopeNode>): ScopeNode[] {
   const roots: ScopeNode[] = [];
   for (const node of nodeMap.values()) {
     if (node.parentId) {
