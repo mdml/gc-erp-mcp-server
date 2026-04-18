@@ -349,7 +349,7 @@ describe("record_cost — validation", () => {
     });
   });
 
-  it("rejects commitment from a different job with invariant_violation (commitment_job_mismatch)", async () => {
+  it("rejects when input.jobId mismatches both scope and commitment (scope check fires first)", async () => {
     const db = await seedFixture();
     await expect(
       recordCost.handler({
