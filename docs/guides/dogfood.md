@@ -63,7 +63,7 @@ bun run db:query:local "SELECT count(*) FROM activities"
 bun run db:query:prod  "SELECT count(*) FROM activities"
 ```
 
-`db:query:prod` warns and requires confirmation before executing any query containing `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, or `ALTER`. Pass `--yes` to skip the prompt in scripted contexts.
+`db:query:prod` warns and requires confirmation before executing any query containing `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, `ALTER`, or `INSERT`. Pass `--yes` to skip the prompt in scripted contexts.
 
 ### Database — reset (local only)
 

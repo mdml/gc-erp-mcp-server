@@ -41,6 +41,7 @@ const DESTRUCTIVE_KEYWORDS = [
   "DROP",
   "TRUNCATE",
   "ALTER",
+  "INSERT",
 ] as const;
 export type DestructiveKeyword = (typeof DESTRUCTIVE_KEYWORDS)[number];
 
