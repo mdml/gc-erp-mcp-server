@@ -107,6 +107,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 - Conventional commits enforced by commitlint on pre-commit-msg.
 - Don't chain `git add/commit` with `&&` across calls — risks lock contention between parallel tool uses.
 - Feature branches `slice/{n}-{name}` or `<type>/<topic>`; main is the integration branch.
+- **Rebase-merge PRs by default, not squash.** From the CLI: `gh pr merge <n> --rebase --delete-branch`. Rebase preserves the PR branch's commit granularity on `main`, which matches this repo's hygiene — PR authors (human or agent) are expected to keep commits meaningful, so collapsing them discards signal. Squash-merge only when Max explicitly asks, or for a WIP-heavy branch where the history isn't the point.
 - **Before suggesting `git reset --hard origin/<branch>`, verify each local commit is reachable from the remote** with `git log origin/<branch> --contains <local-sha>` (run for every local-only sha shown by `git log origin/<branch>..HEAD`). The cost of the lookup is a few seconds; the cost of being wrong is a recovery from `git reflog`. Past incident: a local-only spike commit was claimed to be "already in the squashed merge" — recovered, but ate ~5 minutes. See [retro](docs/retros/2026-04-17-apply-patch-spike-resolution.md). `git reset --hard` is in the deny list anyway, so this guardrail is about *recommending* the operation to the human, not running it directly.
 
 ### Agent config
