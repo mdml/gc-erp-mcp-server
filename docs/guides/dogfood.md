@@ -216,19 +216,23 @@ Run these in order. Each is independently safe to retry.
 
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
-3. `bun run deploy` — deploy the Worker (denied by default; expect a permission prompt)
-4. Smoke-test:
+3. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
+4. Verify the seed:
    ```bash
-   curl -X POST https://gc.leiserson.me/mcp \
-     -H "Authorization: Bearer $MCP_BEARER_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+   bun run db:query:prod "SELECT count(*) FROM activities"
    ```
-   Expect: HTTP 200 with a `tools` array including `apply_patch`, `issue_ntp`, `get_scope_tree`.
+   Expect a count of `22` (the starter library).
+5. Smoke-test end-to-end:
+   ```bash
+   bun run scenario kitchen --target prod
+   ```
+   The new prod-confirm prompt prints a plan; type `y`. Expect `✓ scenario completed`.
 
-   HTTP 401 → bearer mismatch. HTTP 500 → runtime error; tail `wrangler tail gc-erp-mcp-server --remote`.
+   This is the load-bearing smoke-test — it exercises the full Day-0 walkthrough (`create_party` → `create_project` → `create_job` → `create_scope` → `apply_patch` → `issue_ntp` → `get_scope_tree`) against live D1 over the real MCP HTTP transport.
 
-5. Optional: `bun run scenario kitchen --target prod` — full Day-0 walkthrough against live infra.
+   On failure: tail the Worker with `bunx wrangler tail gc-erp-mcp-server --remote` from `packages/mcp-server/` and re-run.
+
+> **Why not a one-shot `curl`?** The streaming HTTP transport is stateful — `tools/list` requires an `Mcp-Session-Id` header obtained from a prior `initialize` handshake. A single `curl tools/list` returns HTTP 400 with `Mcp-Session-Id header is required`, which looks like a bug but isn't. If you need a curl-level check, do it as two requests: POST `initialize` (capture `Mcp-Session-Id` from the response headers), then POST `tools/list` carrying that header. The scenario runner does this for you.
 
 ## Rollback
 
