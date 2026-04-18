@@ -11,4 +11,6 @@ export * from "./get_scope_tree";
 export * from "./issue_ntp";
 export * from "./list_jobs";
 export * from "./list_scopes";
+export * from "./record_cost";
+export * from "./record_direct_cost";
 export * from "./update_scope";
