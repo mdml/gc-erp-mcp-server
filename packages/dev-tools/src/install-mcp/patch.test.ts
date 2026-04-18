@@ -124,27 +124,28 @@ describe("renderProdConnectionGuide", () => {
     expect(out).not.toContain("$");
   });
 
-  it("leads with the Claude.ai connector flow (mobile + web)", () => {
+  it("leads with Mac Claude Desktop (only working path today)", () => {
     const out = renderProdConnectionGuide();
-    const claudeAiIdx = out.indexOf("Claude.ai");
-    const desktopIdx = out.indexOf("Claude Desktop");
-    expect(claudeAiIdx).toBeGreaterThan(-1);
+    const desktopIdx = out.indexOf("Mac Claude Desktop");
+    const claudeAiIdx = out.indexOf("Claude.ai web + mobile");
     expect(desktopIdx).toBeGreaterThan(-1);
-    // Mobile/web is the primary prod use case — must appear first.
-    expect(claudeAiIdx).toBeLessThan(desktopIdx);
+    expect(claudeAiIdx).toBeGreaterThan(-1);
+    // Desktop is the only working surface — must appear before the
+    // not-yet-supported claude.ai section.
+    expect(desktopIdx).toBeLessThan(claudeAiIdx);
   });
 
-  it("includes the in-app connector path for both iOS/Android and web", () => {
-    const out = renderProdConnectionGuide();
-    expect(out).toContain("iOS / Android");
-    expect(out).toContain("Settings");
-    expect(out).toContain("Connectors");
-  });
-
-  it("still includes the Desktop JSON block as Option 2", () => {
+  it("includes the Desktop JSON block with placeholder bearer", () => {
     const out = renderProdConnectionGuide();
     expect(out).toContain('"mcpServers"');
     expect(out).toContain('"type": "http"');
     expect(out).toContain(`Bearer ${PROD_BEARER_PLACEHOLDER}`);
+  });
+
+  it("flags the claude.ai gap and points at the backlog", () => {
+    const out = renderProdConnectionGuide();
+    expect(out).toContain("not yet supported");
+    expect(out).toContain("OAuth");
+    expect(out).toContain("backlog.md");
   });
 });

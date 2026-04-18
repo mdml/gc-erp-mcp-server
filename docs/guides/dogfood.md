@@ -154,7 +154,7 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 > **Note:** `type: "http"` requires Claude Desktop ≥ the version that shipped native HTTP MCP support (early 2026). If your Desktop version doesn't support it, fall back to the `mcp-remote` bridge pattern — the script will detect and warn.
 
-### `install:mcp:prod` — prints connection instructions
+### `install:mcp:prod` — prints the connection guide
 
 Prod credentials are never written to disk by a script. Run:
 
@@ -162,16 +162,13 @@ Prod credentials are never written to disk by a script. Run:
 bun run install:mcp:prod
 ```
 
-The output covers two ways to connect to the deployed Worker, in priority order:
+The output prints a JSON block for `~/Library/Application Support/Claude/claude_desktop_config.json` (alongside any `gc-erp-local` entry) and a note about the not-yet-supported claude.ai path. Replace the bearer placeholder with your `MCP_BEARER_TOKEN` from 1Password `gc-erp` vault and restart Claude Desktop.
 
-1. **Claude.ai (mobile + web)** — recommended for actual prod dogfood. Add a custom connector via the in-app **Settings → Connectors → Add custom connector** flow on iOS/Android, or **Profile → Connectors** on claude.ai. URL + bearer pasted by hand into the form; no JSON file editing.
-2. **Claude Desktop on Mac** — JSON block to paste into `~/Library/Application Support/Claude/claude_desktop_config.json` alongside any `gc-erp-local` entry. Restart Desktop after editing.
+The bearer is always rendered as the literal placeholder `<your MCP_BEARER_TOKEN>` — never interpolated from `$MCP_BEARER_TOKEN`.
 
-The bearer is always rendered as the literal placeholder `<your MCP_BEARER_TOKEN>` — never interpolated from `$MCP_BEARER_TOKEN`. Copy your real token from 1Password `gc-erp` vault by hand.
+After restart, ask Claude in a fresh conversation to "list my jobs" — should call `list_jobs` and return an empty array (or seeded projects if any exist).
 
-Local dev (`gc-erp-local`) isn't useful from mobile — `localhost` doesn't resolve on mobile networks. Mobile is prod-only by design; that's why `install:mcp:prod` leads with the Claude.ai connector flow.
-
-After adding either, ask Claude in a fresh conversation to "list my jobs" — should call `list_jobs` and return an empty array (or seeded projects if any exist).
+> **Mac Claude Desktop is the only working prod client today.** The in-app "Add custom connector" UI on Claude Desktop and Claude.ai (web + iOS + Android) is OAuth-only — no bearer-token field, only OAuth Client ID + Secret. The server currently accepts only static bearer auth, so those flows fail. Adding OAuth (likely Cloudflare Workers OAuth Provider) is tracked in [backlog.md §Runtime / MCP](../product/backlog.md). Until OAuth lands, mobile + web are blocked. Local dev (`gc-erp-local`) is also Mac-Desktop-only; `localhost` doesn't resolve from mobile regardless.
 
 ## First-time local setup
 
