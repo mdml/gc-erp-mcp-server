@@ -7,7 +7,7 @@ import {
   LOCAL_ENTRY_NAME,
   PROD_BEARER_PLACEHOLDER,
   removeLocalEntry,
-  renderProdConfigBlock,
+  renderProdConnectionGuide,
   serializeConfig,
 } from "./patch";
 
@@ -114,13 +114,37 @@ describe("serializeConfig", () => {
   });
 });
 
-describe("renderProdConfigBlock", () => {
+describe("renderProdConnectionGuide", () => {
   it("uses the literal bearer placeholder (never $MCP_BEARER_TOKEN)", () => {
-    const out = renderProdConfigBlock();
-    expect(out).toContain(`Bearer ${PROD_BEARER_PLACEHOLDER}`);
+    const out = renderProdConnectionGuide();
+    expect(out).toContain(PROD_BEARER_PLACEHOLDER);
     expect(out).toContain("gc-erp-prod");
     expect(out).toContain("https://gc.leiserson.me/mcp");
-    // Guardrail: make sure no env-var interpolation snuck into the template.
+    // Guardrail: no env-var interpolation, no shell-substitution syntax.
     expect(out).not.toContain("$");
+  });
+
+  it("leads with the Claude.ai connector flow (mobile + web)", () => {
+    const out = renderProdConnectionGuide();
+    const claudeAiIdx = out.indexOf("Claude.ai");
+    const desktopIdx = out.indexOf("Claude Desktop");
+    expect(claudeAiIdx).toBeGreaterThan(-1);
+    expect(desktopIdx).toBeGreaterThan(-1);
+    // Mobile/web is the primary prod use case — must appear first.
+    expect(claudeAiIdx).toBeLessThan(desktopIdx);
+  });
+
+  it("includes the in-app connector path for both iOS/Android and web", () => {
+    const out = renderProdConnectionGuide();
+    expect(out).toContain("iOS / Android");
+    expect(out).toContain("Settings");
+    expect(out).toContain("Connectors");
+  });
+
+  it("still includes the Desktop JSON block as Option 2", () => {
+    const out = renderProdConnectionGuide();
+    expect(out).toContain('"mcpServers"');
+    expect(out).toContain('"type": "http"');
+    expect(out).toContain(`Bearer ${PROD_BEARER_PLACEHOLDER}`);
   });
 });

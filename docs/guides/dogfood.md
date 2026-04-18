@@ -154,44 +154,24 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 > **Note:** `type: "http"` requires Claude Desktop ≥ the version that shipped native HTTP MCP support (early 2026). If your Desktop version doesn't support it, fall back to the `mcp-remote` bridge pattern — the script will detect and warn.
 
-### `install:mcp:prod` — prints the config block
+### `install:mcp:prod` — prints connection instructions
 
-Prod credentials should not be written to a local file by a script. Instead, print the block:
+Prod credentials are never written to disk by a script. Run:
 
 ```
 bun run install:mcp:prod
 ```
 
-Output:
+The output covers two ways to connect to the deployed Worker, in priority order:
 
-```json
-{
-  "mcpServers": {
-    "gc-erp-prod": {
-      "type": "http",
-      "url": "https://gc.leiserson.me/mcp",
-      "headers": {
-        "Authorization": "Bearer <your MCP_BEARER_TOKEN>"
-      }
-    }
-  }
-}
-```
+1. **Claude.ai (mobile + web)** — recommended for actual prod dogfood. Add a custom connector via the in-app **Settings → Connectors → Add custom connector** flow on iOS/Android, or **Profile → Connectors** on claude.ai. URL + bearer pasted by hand into the form; no JSON file editing.
+2. **Claude Desktop on Mac** — JSON block to paste into `~/Library/Application Support/Claude/claude_desktop_config.json` alongside any `gc-erp-local` entry. Restart Desktop after editing.
 
-Paste this into `claude_desktop_config.json` alongside the `gc-erp-local` entry. The token value is redacted in the printed output — the script uses `$MCP_BEARER_TOKEN` which is already in your environment; copy it in manually.
+The bearer is always rendered as the literal placeholder `<your MCP_BEARER_TOKEN>` — never interpolated from `$MCP_BEARER_TOKEN`. Copy your real token from 1Password `gc-erp` vault by hand.
 
-After editing, restart Claude Desktop. Smoke-test in a conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
+Local dev (`gc-erp-local`) isn't useful from mobile — `localhost` doesn't resolve on mobile networks. Mobile is prod-only by design; that's why `install:mcp:prod` leads with the Claude.ai connector flow.
 
-## Claude.ai Connectors (mobile / web)
-
-Claude iOS and Android support remote MCP connectors. In-app: **Settings → Connectors → Add custom connector**.
-
-- **URL:** `https://gc.leiserson.me/mcp`
-- **Bearer token:** your `MCP_BEARER_TOKEN` from 1Password `gc-erp` vault
-
-Local dev is not useful from mobile (localhost doesn't resolve on mobile networks). Prod-only on mobile is the right setup.
-
-The web interface at claude.ai supports the same connector configuration under Profile → Connectors.
+After adding either, ask Claude in a fresh conversation to "list my jobs" — should call `list_jobs` and return an empty array (or seeded projects if any exist).
 
 ## First-time local setup
 

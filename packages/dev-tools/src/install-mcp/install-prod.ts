@@ -1,27 +1,23 @@
 #!/usr/bin/env bun
 /**
- * CLI for `bun run install:mcp:prod`. Prints the `gc-erp-prod` config
- * block to stdout and exits — never writes a file and never
- * interpolates `$MCP_BEARER_TOKEN` into the output. The user copies the
- * block, pastes it into their own Claude Desktop / mobile connector
- * config, and substitutes the bearer by hand from 1Password.
+ * CLI for `bun run install:mcp:prod`. Prints connection instructions for
+ * the deployed Worker and exits — never writes a file and never
+ * interpolates `$MCP_BEARER_TOKEN` into the output.
+ *
+ * Two options surfaced, Claude.ai (mobile + web) first since that's the
+ * primary prod dogfood path. Claude Desktop on Mac is Option 2.
  *
  * Rationale: prod credentials shouldn't be written to an on-disk config
  * by an automated script (docs/guides/dogfood.md §install:mcp:prod).
  *
- * Excluded from coverage — the rendered block is a pure function tested
- * in patch.test.ts (`renderProdConfigBlock`).
+ * Excluded from coverage — the rendered guide is a pure function tested
+ * in patch.test.ts (`renderProdConnectionGuide`).
  */
 
-import { renderProdConfigBlock } from "./patch";
+import { renderProdConnectionGuide } from "./patch";
 
 async function main(): Promise<number> {
-  process.stdout.write(renderProdConfigBlock());
-  process.stdout.write(
-    "\nPaste the block above into ~/Library/Application Support/Claude/claude_desktop_config.json " +
-      "(alongside any existing `gc-erp-local` entry) and replace the placeholder " +
-      "with your MCP_BEARER_TOKEN from 1Password.\n",
-  );
+  process.stdout.write(renderProdConnectionGuide());
   return 0;
 }
 
