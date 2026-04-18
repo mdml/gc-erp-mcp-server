@@ -43,7 +43,7 @@ Commit messages are conventional-commit. Cadence varies — the test is "does th
 2. **Log a [retro](../retros/CLAUDE.md)** if the session made a meaningful change (ADR, schema shift, doc restructure, hard debug). Not every session needs one.
 3. **Commit.** The retro is part of the session's commit, not a separate one.
 4. **Push.** Solo mode: push the feature branch. Worktree mode: the parallel agent opens or updates a PR back to the feature branch.
-5. **Feature → `main`** only when the whole feature is done. Deliberate act, not a session boundary.
+5. **Feature → `main`** only when the whole feature is done. Deliberate act, not a session boundary. Default to rebase-merge (`gh pr merge <n> --rebase --delete-branch`) to preserve the PR branch's commit granularity; squash only when Max asks or the PR history is genuinely noise.
 
 ## Parallel worktrees — operating guide
 
