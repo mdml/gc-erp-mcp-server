@@ -7,8 +7,7 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 ## Up next
 
 1. **Prod deploy.** Apply migrations `0001` + `0002`, seed 22 activities, deploy Worker. Smoke-test with `curl` + `scenario kitchen --target prod`. See [dogfood.md §Prod deploy checklist](../guides/dogfood.md).
-2. **`record_cost` + `record_direct_cost` — Day 14 / Day 18.** `record_cost` ties a cost to an activation + commitment + scope; `record_direct_cost` atomically creates a self-commitment via `apply_patch` + the cost.
-3. **Day 60 change-order scenario** in `kitchen.ts`. Validates `addActivation` + `setPrice` in one patch; parity check (fold patches → commitments table) lands alongside as a scenario-runner assertion per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) §F3.2.
+2. **Day 60 change-order scenario** in `kitchen.ts`. Validates `addActivation` + `setPrice` in one patch; parity check (fold patches → commitments table) lands alongside as a scenario-runner assertion per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) §F3.2.
 
 ## In flight
 
@@ -20,6 +19,7 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Recently done
 
+- **`record_cost` + `record_direct_cost` landed** (2026-04-18) on `slice/record-cost`: TOOLS.md §3.2 (Day 14) + §3.3 (Day 18). `record_cost` is an append-only insert with cross-job + voided-commitment + activity-on-commitment + activation-belongs-to-commitment gates. `record_direct_cost` extracts a `composePatch` helper from `apply_patch` so the self-commitment + cost land in one D1 batch (ADR 0008) — atomicity test forces a batch-time cost-insert failure and asserts no orphaned commitment. 24 new tool tests + 19 existing apply_patch tests green. Opens PR against `feat/dogfood-prep`.
 - **Dogfood script surface landed** (2026-04-18): `db:migrate:{local,prod}`, `db:seed:activities:{local,prod}`, `db:seed:kitchen:local`, `db:query:{local,prod}`, `db:reset:local`, `install:mcp:{local,prod}`, `scenario --target`. Shared plan+confirm helper; `:prod` seeding goes through a tempfile + `wrangler d1 execute --file`. Implementation in `packages/dev-tools/src/{db,install-mcp,plan-confirm,scenarios/args}.ts`; roots in `package.json`. Opens PR against `feat/dogfood-prep`.
 - **M2 fully on `main`** (2026-04-18): `apply_patch` (ADR 0008 D1-batch atomicity, 6 edit ops, void projection); `issue_ntp` (Day 10, derived schedule per ADR 0007); `get_scope_tree` + kitchen Day 3/10 wiring (subtree rollups, `Demo.committed = $1,500`, `startBy 2026-05-04`); `create_party`. PRs #11, #13, #15, #17, #18.
 - **Dogfood target concept documented** (2026-04-18): [docs/guides/dogfood.md](../guides/dogfood.md) — script surface, bearer token story, Claude Desktop + mobile config, plan+confirm pattern. Implementation deferred to follow-up session (now.md item 2 above).
