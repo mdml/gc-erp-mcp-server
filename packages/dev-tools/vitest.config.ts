@@ -26,13 +26,24 @@ export default defineConfig({
         // tests (packages/mcp-server/src/tools/*.test.ts) per ADR 0004
         // §Decision; the runner is a thin transport wrapper that exists to
         // drive `bun run dev` in-process during demos. Pure helpers
-        // (assert.ts) stay covered.
+        // (assert.ts, args.ts) stay covered.
         "src/scenarios/client.ts",
         "src/scenarios/kitchen.ts",
         "src/scenarios/reset.ts",
         "src/scenarios/reset-cli.ts",
         "src/scenarios/run.ts",
         "src/scenarios/scenarios.ts",
+        // Shared wrangler-spawn wrapper — subprocess orchestrator, no logic.
+        "src/wrangler.ts",
+        // Dogfood-script CLIs — thin dispatchers + wrangler/readline I/O.
+        // Pure helpers (plan-confirm, seed-activities-sql, install-mcp/patch)
+        // are tested alongside the CLIs they back.
+        "src/db/migrate.ts",
+        "src/db/query.ts",
+        "src/db/reset.ts",
+        "src/db/seed-activities.ts",
+        "src/install-mcp/install-local.ts",
+        "src/install-mcp/install-prod.ts",
       ],
       reporter: ["text", "text-summary", "json-summary"],
       reportsDirectory: "./coverage",

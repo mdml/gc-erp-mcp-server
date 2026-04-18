@@ -19,6 +19,7 @@ export default defineConfig({
         "src/schema/index.ts",
         "src/ids/index.ts",
         "src/invariants/index.ts",
+        "src/seed/index.ts",
       ],
       reporter: ["text", "text-summary", "json-summary"],
       reportsDirectory: "./coverage",
