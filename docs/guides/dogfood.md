@@ -140,10 +140,16 @@ The entry it writes:
 {
   "mcpServers": {
     "gc-erp-local": {
-      "type": "http",
-      "url": "http://localhost:8787/mcp",
-      "headers": {
-        "Authorization": "Bearer dev"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8787/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer dev"
       }
     }
   }
@@ -152,7 +158,7 @@ The entry it writes:
 
 The token `dev` is the fixed local value from `.dev.vars`. It is not a secret — nothing in local D1 warrants protection.
 
-> **Note:** `type: "http"` requires Claude Desktop ≥ the version that shipped native HTTP MCP support (early 2026). If your Desktop version doesn't support it, fall back to the `mcp-remote` bridge pattern — the script will detect and warn.
+> **Why `mcp-remote` and not `type: "http"`?** Claude Desktop's `claude_desktop_config.json` only accepts stdio entries today; entries with `type: "http"` (or similar streaming-transport shapes) are rejected as "not a valid MCP server configuration" at Desktop startup. We bridge via the `mcp-remote` npm package, which spawns a local stdio proxy that forwards to our HTTP server with the bearer header attached. The space-less `Authorization:${AUTH_HEADER}` + `AUTH_HEADER: "Bearer dev"` env split works around a Claude-Desktop-on-Windows spaces-in-args bug noted in [mcp-remote's readme](https://github.com/geelen/mcp-remote#readme) — Mac tolerates the space-ful form, but the env-split shape is portable.
 
 ### `install:mcp:prod` — prints the connection guide
 

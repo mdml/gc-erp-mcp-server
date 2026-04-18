@@ -11,13 +11,34 @@
 export const LOCAL_ENTRY_NAME = "gc-erp-local";
 export const PROD_ENTRY_NAME = "gc-erp-prod";
 
+/**
+ * Claude Desktop's `claude_desktop_config.json` only accepts stdio entries
+ * — `type: "http"` (and similar streaming-transport shapes) is rejected as
+ * "not a valid MCP server configuration" on current Desktop. We bridge via
+ * the `mcp-remote` npm package, which proxies stdio↔HTTP + handles auth.
+ *
+ * Header encoding: `Authorization:${AUTH_HEADER}` (no space around the
+ * colon) with the full `Bearer <token>` in the `env` section dodges the
+ * Claude-Desktop-on-Windows / Cursor spaces-in-args bug. Mac tolerates the
+ * space-ful form too, but this shape is portable. See mcp-remote docs:
+ * https://github.com/geelen/mcp-remote#readme §Custom Headers.
+ *
+ * `-y` auto-accepts npx's first-run install prompt so Desktop doesn't
+ * block waiting on user input.
+ */
 export const LOCAL_ENTRY = {
-  type: "http",
-  url: "http://localhost:8787/mcp",
-  headers: {
+  command: "npx",
+  args: [
+    "-y",
+    "mcp-remote",
+    "http://localhost:8787/mcp",
+    "--header",
+    "Authorization:${AUTH_HEADER}",
+  ],
+  env: {
     // Fixed local token from .dev.vars — not a secret, by design
     // (docs/guides/dogfood.md §Bearer token story).
-    Authorization: "Bearer dev",
+    AUTH_HEADER: "Bearer dev",
   },
 } as const;
 
@@ -85,10 +106,17 @@ export function renderProdConnectionGuide(): string {
     {
       mcpServers: {
         [PROD_ENTRY_NAME]: {
-          type: "http",
-          url: "https://gc.leiserson.me/mcp",
-          headers: {
-            Authorization: `Bearer ${PROD_BEARER_PLACEHOLDER}`,
+          command: "npx",
+          args: [
+            "-y",
+            "mcp-remote",
+            "https://gc.leiserson.me/mcp",
+            "--header",
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: literal ${AUTH_HEADER} for mcp-remote runtime expansion, not a TS template
+            "Authorization:${AUTH_HEADER}",
+          ],
+          env: {
+            AUTH_HEADER: `Bearer ${PROD_BEARER_PLACEHOLDER}`,
           },
         },
       },
