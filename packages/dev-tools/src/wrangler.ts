@@ -1,6 +1,6 @@
 /**
  * Tiny wrangler-spawn wrapper used by dogfood-script CLIs (db:migrate,
- * db:query, db:reset, db:seed:activities, …). All of these shell out to
+ * db:query, db:reset, db:seed:activities:*, …). All of these shell out to
  * `bunx wrangler <subcommand>` with stdout/stderr inherited so the user
  * sees real-time output.
  *

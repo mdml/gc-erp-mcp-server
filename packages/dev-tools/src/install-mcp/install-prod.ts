@@ -15,9 +15,14 @@
 
 import { renderProdConfigBlock } from "./patch";
 
-process.stdout.write(renderProdConfigBlock());
-process.stdout.write(
-  "\nPaste the block above into ~/Library/Application Support/Claude/claude_desktop_config.json " +
-    "(alongside any existing `gc-erp-local` entry) and replace the placeholder " +
-    "with your MCP_BEARER_TOKEN from 1Password.\n",
-);
+async function main(): Promise<number> {
+  process.stdout.write(renderProdConfigBlock());
+  process.stdout.write(
+    "\nPaste the block above into ~/Library/Application Support/Claude/claude_desktop_config.json " +
+      "(alongside any existing `gc-erp-local` entry) and replace the placeholder " +
+      "with your MCP_BEARER_TOKEN from 1Password.\n",
+  );
+  return 0;
+}
+
+process.exit(await main());

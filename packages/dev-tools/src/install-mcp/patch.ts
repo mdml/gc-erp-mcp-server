@@ -63,7 +63,7 @@ export function backupPath(configPath: string, now: Date): string {
   return `${configPath}.${backupTimestamp(now)}.bak`;
 }
 
-/** Stable JSON output: 2-space indent, trailing newline, lexical key order. */
+/** 2-space indent, trailing newline, insertion-order preserved. */
 export function serializeConfig(config: DesktopConfig): string {
   return `${JSON.stringify(config, null, 2)}\n`;
 }
