@@ -10,7 +10,6 @@
  * module is the orchestrator only.
  */
 
-import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -18,10 +17,14 @@ import { fileURLToPath } from "node:url";
  * `wrangler.jsonc`, the `d1_databases` binding, and the `migrations_dir`
  * from this directory. Computed from `import.meta.url` so the helper
  * works regardless of the shell's cwd.
+ *
+ * Do NOT wrap in `dirname()`: the URL already resolves to the directory
+ * (trailing slash); `dirname` would shave off the `mcp-server/` segment
+ * and leave wrangler in `packages/` with no `wrangler.jsonc` to find.
  */
 export function mcpServerDir(): string {
   // src/wrangler.ts → packages/dev-tools/src/ → packages/mcp-server/
-  return dirname(fileURLToPath(new URL("../../mcp-server/", import.meta.url)));
+  return fileURLToPath(new URL("../../mcp-server/", import.meta.url));
 }
 
 export interface RunWranglerOpts {
