@@ -9,6 +9,7 @@ import {
   createProject,
   createScope,
   ensureActivity,
+  issueNtp,
   listJobs,
   listScopes,
   registerToolOn,
@@ -55,6 +56,7 @@ export class GcErpMcp extends McpAgent<Env> {
     registerToolOn(this.server, listScopes, db);
     registerToolOn(this.server, ensureActivity, db);
     registerToolOn(this.server, applyPatch, db);
+    registerToolOn(this.server, issueNtp, db);
   }
   /* v8 ignore stop */
 }
