@@ -49,6 +49,12 @@ function parseTarget(argv: readonly string[]): Target {
   return target;
 }
 
+/**
+ * Mints fresh `act_…` IDs on every call. Idempotency rides on the
+ * `UNIQUE (slug)` constraint + `INSERT OR IGNORE` — so whoever runs
+ * `db:seed:activities:prod` *first* permanently fixes the activity IDs
+ * in prod. Subsequent runs no-op regardless of the IDs they generated.
+ */
 function buildRows(): ActivitySeedInput[] {
   return STARTER_ACTIVITIES.map((a) => ({
     id: newActivityId(),
