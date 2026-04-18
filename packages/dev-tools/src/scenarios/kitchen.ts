@@ -32,7 +32,7 @@ const CHILD_SCOPE_NAMES = [
 export async function runKitchen(ctx: ScenarioContext): Promise<void> {
   await day0(ctx);
   await day3(ctx);
-  // await day10(ctx); — depends on issue_ntp landing (Prompt 2)
+  await day10(ctx);
 }
 
 async function day0(ctx: ScenarioContext): Promise<void> {
@@ -354,4 +354,28 @@ async function verifyDay3ScopeTree(
   );
 
   ctx.log("  ✓ get_scope_tree → Kitchen=$8,500  Demo=$1,500  Framing=$7,000");
+}
+
+// ---------------------------------------------------------------------------
+// Day 10 — NTP for the lumber drop (TOOLS.md §6 Day 10)
+// ---------------------------------------------------------------------------
+
+async function day10(ctx: ScenarioContext): Promise<void> {
+  ctx.log("── Day 10 — NTP on the lumber drop activation");
+  const aDropId = ctx.state.aDropId as string;
+
+  const { ntp, startBy, finishBy } = await ctx.client.call<{
+    ntp: { id: string; activationId: string; issuedOn: string };
+    startBy: string;
+    finishBy: string;
+  }>("issue_ntp", { activationId: aDropId, issuedOn: "2026-04-27" });
+
+  assertTrue(ntp.id.startsWith("ntp_"), "issue_ntp returned an ntp_ id");
+  assertEqual(ntp.activationId, aDropId, "NTP targets the lumber drop");
+  assertEqual(startBy, "2026-05-04", "startBy = Mon 2026-05-04 (lead 5 wd)");
+  assertEqual(finishBy, "2026-05-05", "finishBy = Tue 2026-05-05 (build 1 wd)");
+
+  ctx.log(
+    `  ✓ issue_ntp     → ${ntp.id} (startBy ${startBy}, finishBy ${finishBy})`,
+  );
 }
