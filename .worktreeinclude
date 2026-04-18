@@ -12,3 +12,10 @@
 # Personal 1Password refs — lets a dev optionally `eval $(op signin) && bun run sync-secrets`
 # inside the worktree to refresh secrets without hand-copying refs.
 .env.op.local
+
+# Agent permission policy. `bun install`'s post-checkout bootstrap regenerates
+# this from `packages/agent-config/src/policy/`, but Claude Code reads the file
+# at session-start — racing the bootstrap. Copying it in eliminates the race so
+# the first `git fetch` / `git checkout -b` in a fresh worktree auto-allows
+# without prompting. Bootstrap re-renders it idempotently with the same content.
+.claude/settings.json
