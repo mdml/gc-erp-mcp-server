@@ -2,18 +2,18 @@
 
 Short, ordered. Updated at the start/end of each working session (see [retros](../retros/)). If a task moves, cross it off and note where it went. If this file grows past ~20 lines, prune — it's a working doc, not a log.
 
-**Milestone:** [M2 — Commitment + NTP model](milestones.md)
+**Milestone:** [M2 — Commitment + NTP model](milestones.md) — fully on `main`
 
 ## Up next
 
-1. **`issue_ntp` — Day 10 (thin).** Single INSERT into `ntp_events`; derived `startBy`/`finishBy` from current activation per [ADR 0007](../decisions/0007-ntp-derivation-from-current-activation.md). Reject NTPs targeting activations on voided commitments per [ADR 0006](../decisions/0006-void-commitment-semantics.md) (voidedness now a column read per [ADR 0009](../decisions/0009-void-state-projected-on-commitments.md)).
-2. **`get_scope_tree` + Day 3 / Day 10 wiring.** Subtree rollups per [ADR 0005](../decisions/0005-activations-carry-scopeid.md); filter voided commitments via `WHERE voided_at IS NULL` (ADR 0009). Wire Day 3 + Day 10 into `kitchen.ts`; assert `Demo.committed = $1,500`, `Framing.committed = $7,000`, `startBy 2026-05-04` / `finishBy 2026-05-05`.
-3. **`record_cost` + `record_direct_cost` — Day 14 / Day 18.** Blocked on (1) + (2). `record_cost` ties a cost to an activation + commitment + scope; `record_direct_cost` atomically creates a self-commitment via `apply_patch` + the cost.
+1. **Prod deploy.** Apply migrations `0001` + `0002`, seed 22 activities, deploy Worker. Smoke-test with `curl` + `scenario kitchen --target prod`. See [dogfood.md §Prod deploy checklist](../guides/dogfood.md).
+2. **Implement dogfood scripts** per [docs/guides/dogfood.md](../guides/dogfood.md) — `db:migrate:local/prod`, `db:seed:activities:local/prod`, `db:seed:kitchen:local`, `db:query:local/prod`, `db:reset:local`, `install:mcp:local [--remove]`, `install:mcp:prod`, `scenario --target` flag. Lives in `packages/dev-tools`; scripts wired from root `package.json`.
+3. **`record_cost` + `record_direct_cost` — Day 14 / Day 18.** `record_cost` ties a cost to an activation + commitment + scope; `record_direct_cost` atomically creates a self-commitment via `apply_patch` + the cost.
 4. **Day 60 change-order scenario** in `kitchen.ts`. Validates `addActivation` + `setPrice` in one patch; parity check (fold patches → commitments table) lands alongside as a scenario-runner assertion per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) §F3.2.
 
 ## In flight
 
-- **`apply_patch`** — on `slice/m2-apply-patch`. ADR 0008 batch flow, six `CommitmentEdit` ops, post-fold invariants, 19 tests (Layer 1). Voidedness projected via `commitments.voided_at` + `voided_reason` ([ADR 0009](../decisions/0009-void-state-projected-on-commitments.md), migration `0002_quick_kylun.sql`). Handler-layer gates cover cross-job scopes, voided-commitment edits, F1.3 NTP-blocks-remove, and parent-patch jobId match. `kitchen.ts` wiring deferred to the `get_scope_tree` slice. PR open to `main`.
+*(nothing)*
 
 ## Waiting on
 
@@ -21,6 +21,8 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Recently done
 
+- **M2 fully on `main`** (2026-04-18): `apply_patch` (ADR 0008 D1-batch atomicity, 6 edit ops, void projection); `issue_ntp` (Day 10, derived schedule per ADR 0007); `get_scope_tree` + kitchen Day 3/10 wiring (subtree rollups, `Demo.committed = $1,500`, `startBy 2026-05-04`); `create_party`. PRs #11, #13, #15, #17, #18.
+- **Dogfood target concept documented** (2026-04-18): [docs/guides/dogfood.md](../guides/dogfood.md) — script surface, bearer token story, Claude Desktop + mobile config, plan+confirm pattern. Implementation deferred to follow-up session (now.md item 2 above).
 - **`apply_patch` spike resolved** on `slice/resolve-apply-patch-spike`: four ADRs landed ([0005](../decisions/0005-activations-carry-scopeid.md) activations carry scopeId, [0006](../decisions/0006-void-commitment-semantics.md) void excludes from rollups, [0007](../decisions/0007-ntp-derivation-from-current-activation.md) NTP recomputes from current activation / drop `siteReady`, [0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md) D1-batch atomicity). SPEC §1 adds `Activation.scopeId` + drops `NTPEvent.siteReady`; migration `0001` is additive. Post-fold `assertActivationScopesInCommitment` invariant + F2.1 `jobId`-in-hash + F1.1 `setActivation` tightening + F2.5 equivalence test. New backlog entry: "Schedule event log — DelayEvent + activation closure" (absorbs the rain/site-block scenario + variance math). 146/146 database tests + 51/51 mcp-server tests green. M2 tool implementation unblocked.
 - **`create_party` tool landed** on `slice/m2-create-party`: standalone slice for TOOLS.md §3.1 (`{ kind, name, email? } → Party`). Pure-handler + `createTestDb()` tests (6 tests), registered in `McpAgent.init()`. No Day 3 wiring — kitchen.ts update waits for `apply_patch`.
 - **Scenario runner + Day-0 tools landed** on `slice/scenario-runner`: `bun run scenario kitchen [--reset]` drives TOOLS.md §6 Day 0 over MCP HTTP against `bun run dev`. Added `create_project`, `create_scope`, `update_scope`, `list_scopes` tools (pure-handler + in-memory-sqlite tests per [ADR 0004](../decisions/0004-acceptance-testing-strategy.md) Layer 1) and the `packages/dev-tools/src/scenarios/` scaffold (client, reset, kitchen day blocks, assert helpers — Layer 2). `--reset` applies migrations + truncates local D1 idempotently. Smoke-tested end-to-end against `bun run dev`; 45/45 tool tests + 40/40 dev-tools tests passing, gate green.
