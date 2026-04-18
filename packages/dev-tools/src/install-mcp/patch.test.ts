@@ -125,6 +125,7 @@ describe("renderProdConnectionGuide", () => {
     // substitution marker — so we check for the dangerous leak shape
     // specifically rather than banning every `$`.
     expect(out).not.toContain("$MCP_BEARER_TOKEN");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal leak-shape we're asserting is absent, not a template literal
     expect(out).not.toContain("${MCP_BEARER_TOKEN}");
   });
 
@@ -145,6 +146,7 @@ describe("renderProdConnectionGuide", () => {
     // stdio-via-mcp-remote, not the Desktop-rejected type: "http" shape
     expect(out).toContain('"command": "npx"');
     expect(out).toContain('"mcp-remote"');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcp-remote interpolation marker, not a template literal
     expect(out).toContain('"Authorization:${AUTH_HEADER}"');
     // Bearer placeholder lands in env, not directly in args
     expect(out).toContain(`"AUTH_HEADER": "Bearer ${PROD_BEARER_PLACEHOLDER}"`);
