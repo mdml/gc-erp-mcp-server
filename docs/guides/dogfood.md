@@ -52,6 +52,8 @@ bun run db:seed:kitchen:local       # SPEC §2 kitchen walkthrough fixture (was:
 
 `db:seed:activities:*` is idempotent — `ON CONFLICT (slug) DO NOTHING`. Safe to run multiple times. The prod variant prints a plan and prompts before executing (see [Plan + confirm pattern](#plan--confirm-pattern)).
 
+> **`db:seed:kitchen:local` is wired but not yet functional.** The script exists at the new name, but its handler still exits with "D1 provisioning pending" — the seeder logic (`packages/database/src/seed/kitchen-fixture.ts`) runs against better-sqlite3 in tests only. Rewiring it to D1 via the same `wrangler d1 execute --file` path as `db:seed:activities:{local,prod}` is tracked in [backlog.md §Dev tooling](../product/backlog.md).
+
 No `db:seed:kitchen:prod` — the kitchen fixture is synthetic test data, not real-work data.
 
 ### Database — ad-hoc queries
