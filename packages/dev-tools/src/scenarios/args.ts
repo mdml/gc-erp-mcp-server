@@ -15,6 +15,38 @@ export const TARGET_URLS: Record<Target, string> = {
   prod: "https://gc.leiserson.me/mcp",
 };
 
+const NON_PROD_HOSTNAMES: ReadonlySet<string> = new Set([
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+]);
+
+/**
+ * Decide whether a server URL points at a prod-like host. This — not the
+ * `--target` flag — is what gates the confirm prompt: `--target local`
+ * combined with an overriding `MCP_SERVER_URL=https://gc.leiserson.me/mcp`
+ * would otherwise hit prod without a confirm.
+ *
+ * Non-prod hosts: entries in `NON_PROD_HOSTNAMES` + any `*.local` hostname
+ * (mDNS / Bonjour). Everything else is prod-like. On parse failure the
+ * default is **prod-like** — safer to over-prompt than miss a real host.
+ */
+export function isProdLikeUrl(url: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  // `URL` wraps IPv6 hostnames in brackets when re-serialized, but
+  // `.hostname` returns them without brackets. Strip anyway for safety.
+  const bare = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+  if (NON_PROD_HOSTNAMES.has(bare)) return false;
+  if (bare.endsWith(".local")) return false;
+  return true;
+}
+
 export interface ParsedArgs {
   name: string | null;
   reset: boolean;

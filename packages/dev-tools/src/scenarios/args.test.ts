@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseArgs, resolveConfig, TARGET_URLS } from "./args";
+import { isProdLikeUrl, parseArgs, resolveConfig, TARGET_URLS } from "./args";
 
 describe("parseArgs", () => {
   it("defaults target=local, yes=false when no flags", () => {
@@ -48,6 +48,44 @@ describe("parseArgs", () => {
     expect(parseArgs(["--reset", "kitchen", "--target", "prod"])).toMatchObject(
       { name: "kitchen", reset: true, target: "prod" },
     );
+  });
+});
+
+describe("isProdLikeUrl", () => {
+  it("treats the deployed host as prod-like", () => {
+    expect(isProdLikeUrl("https://gc.leiserson.me/mcp")).toBe(true);
+  });
+
+  it("treats localhost + standard loopback addresses as non-prod", () => {
+    expect(isProdLikeUrl("http://localhost:8787/mcp")).toBe(false);
+    expect(isProdLikeUrl("http://127.0.0.1:9000/mcp")).toBe(false);
+    expect(isProdLikeUrl("http://0.0.0.0:8787/mcp")).toBe(false);
+  });
+
+  it("treats the IPv6 loopback [::1] as non-prod", () => {
+    expect(isProdLikeUrl("http://[::1]:8787/mcp")).toBe(false);
+  });
+
+  it("treats *.local (mDNS) hostnames as non-prod", () => {
+    expect(isProdLikeUrl("http://gc.local/mcp")).toBe(false);
+    expect(isProdLikeUrl("http://host.lab.local:9000/mcp")).toBe(false);
+  });
+
+  it("is case-insensitive on hostname matching", () => {
+    expect(isProdLikeUrl("http://LOCALHOST:8787/mcp")).toBe(false);
+    expect(isProdLikeUrl("http://HOST.LOCAL/mcp")).toBe(false);
+  });
+
+  it("defensively returns true on unparseable input", () => {
+    expect(isProdLikeUrl("not-a-url")).toBe(true);
+    expect(isProdLikeUrl("")).toBe(true);
+  });
+
+  it("treats non-loopback IPs as prod-like", () => {
+    // A LAN-scoped IP still gets the prompt — we'd rather false-positive
+    // than miss an actual prod endpoint hosted off-tree.
+    expect(isProdLikeUrl("http://192.168.1.10:8787/mcp")).toBe(true);
+    expect(isProdLikeUrl("https://gc-erp.example.com/mcp")).toBe(true);
   });
 });
 

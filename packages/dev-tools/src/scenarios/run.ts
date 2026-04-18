@@ -28,7 +28,12 @@
  */
 
 import { planAndConfirm } from "../plan-confirm";
-import { parseArgs, type ResolvedConfig, resolveConfig } from "./args";
+import {
+  isProdLikeUrl,
+  parseArgs,
+  type ResolvedConfig,
+  resolveConfig,
+} from "./args";
 import { ScenarioAssertionError } from "./assert";
 import { connectMcp } from "./client";
 import { resetLocalD1 } from "./reset";
@@ -102,12 +107,15 @@ function handleEarlyExit(args: ReturnType<typeof parseArgs>): number | null {
 }
 
 async function confirmProdIfNeeded(cfg: ResolvedConfig): Promise<boolean> {
-  if (cfg.target !== "prod") return true;
+  // Gate on the actual URL, not the `--target` flag. An overriding
+  // `MCP_SERVER_URL` can point `--target local` at a prod host; the URL
+  // is the load-bearing signal of "this writes to real data."
+  if (!isProdLikeUrl(cfg.url)) return true;
   return planAndConfirm({
     plan: {
-      title: `scenario ${cfg.name} --target prod`,
+      title: `scenario ${cfg.name} --target ${cfg.target}`,
       actions: [
-        `run scenario against ${cfg.url}`,
+        `run scenario against ${cfg.url} (prod-like host)`,
         "this will create real data in the live D1 database",
         "idempotent? no — each run mints new IDs and inserts fresh rows",
       ],
