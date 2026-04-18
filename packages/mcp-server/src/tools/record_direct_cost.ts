@@ -225,6 +225,10 @@ export const recordDirectCost: McpToolDef<
     // all roll back. No orphaned commitment.
     await submitBatch(db, [...stmts, costInsertStmt(db, cost)]);
 
-    return { cost: Cost.parse(cost), commitment, patchId: patch.id };
+    return {
+      cost: Cost.parse(cost),
+      commitment: Commitment.parse(commitment),
+      patchId: patch.id,
+    };
   },
 };
