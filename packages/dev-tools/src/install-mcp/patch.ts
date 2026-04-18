@@ -33,6 +33,7 @@ export const LOCAL_ENTRY = {
     "mcp-remote",
     "http://localhost:8787/mcp",
     "--header",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcp-remote interpolation marker; env below fills AUTH_HEADER at spawn time
     "Authorization:${AUTH_HEADER}",
   ],
   env: {
