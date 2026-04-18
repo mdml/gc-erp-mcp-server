@@ -55,7 +55,7 @@ describe("parseYesFlag", () => {
 });
 
 describe("detectDestructiveKeywords", () => {
-  it("finds DELETE / UPDATE / DROP / TRUNCATE / ALTER case-insensitively", () => {
+  it("finds DELETE / UPDATE / DROP / TRUNCATE / ALTER / INSERT case-insensitively", () => {
     expect(detectDestructiveKeywords("DELETE FROM jobs")).toEqual(["DELETE"]);
     expect(detectDestructiveKeywords("update jobs set x = 1")).toEqual([
       "UPDATE",
@@ -67,6 +67,9 @@ describe("detectDestructiveKeywords", () => {
     expect(detectDestructiveKeywords("ALTER TABLE jobs ADD x")).toEqual([
       "ALTER",
     ]);
+    expect(
+      detectDestructiveKeywords("INSERT INTO jobs (id) VALUES ('x')"),
+    ).toEqual(["INSERT"]);
   });
 
   it("reports multiple hits when a query mixes destructive ops", () => {
@@ -78,13 +81,20 @@ describe("detectDestructiveKeywords", () => {
   });
 
   it("ignores destructive words embedded in identifiers", () => {
-    // `updated_at` column, `dropped_flag` alias, `alterations` table, etc.
+    // `updated_at` / `inserted_at` columns, `dropped_flag` alias,
+    // `alterations` / `inserts` tables, etc. should not trip the match.
     expect(detectDestructiveKeywords("SELECT updated_at FROM jobs")).toEqual(
       [],
     );
     expect(
       detectDestructiveKeywords("SELECT * FROM alterations WHERE dropped = 0"),
     ).toEqual([]);
+    expect(detectDestructiveKeywords("SELECT inserted_at FROM jobs")).toEqual(
+      [],
+    );
+    expect(detectDestructiveKeywords("SELECT count(*) FROM inserts")).toEqual(
+      [],
+    );
   });
 
   it("returns [] for plain SELECT queries", () => {
