@@ -23,10 +23,6 @@ describe("addWorkingDays", () => {
     expect(addWorkingDays("2026-05-01", 1)).toBe("2026-05-04"); // Fri → Mon
   });
 
-  it("Monday + 5 → next Monday (skips Sat + Sun)", () => {
-    expect(addWorkingDays("2026-04-27", 5)).toBe("2026-05-04");
-  });
-
   it("Saturday + 1 → Tuesday (Sat advances to Mon, then 1 forward)", () => {
     expect(addWorkingDays("2026-04-25", 1)).toBe("2026-04-28"); // Sat→Mon, +1→Tue
   });

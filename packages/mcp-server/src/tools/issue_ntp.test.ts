@@ -21,7 +21,9 @@ import { applyPatch } from "./apply_patch";
 import { issueNtp } from "./issue_ntp";
 
 // ---------------------------------------------------------------------------
-// Fixture constants
+// Fixture constants — deterministic string ids cast to branded types.
+// Production code uses the new*Id() generators; tests cast literals so
+// assertions can reference ids by name without capturing return values.
 // ---------------------------------------------------------------------------
 
 const projectId = "proj_test" as ProjectId;

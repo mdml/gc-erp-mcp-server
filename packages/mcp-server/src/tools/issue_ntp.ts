@@ -38,7 +38,7 @@ export const issueNtp: McpToolDef<typeof IssueNtpInput, typeof IssueNtpOutput> =
   {
     name: "issue_ntp",
     description:
-      "Issue a Notice to Proceed for an activation. Derives startBy = issuedOn + activation.leadTime and finishBy = startBy + activation.buildTime from current activation state (ADR 0007). Multiple NTPs per activation are allowed — latest wins for scheduling. Errors: not_found (activation unknown); invariant_violation (commitment voided per ADR 0009).",
+      "Issue a Notice to Proceed for an activation. Derives startBy = issuedOn + activation.leadTime and finishBy = startBy + activation.buildTime from current activation state (ADR 0007). Multiple NTPs per activation are allowed. Errors: not_found (activation unknown); invariant_violation (commitment voided per ADR 0009).",
     inputSchema: IssueNtpInput,
     outputSchema: IssueNtpOutput,
     handler: async ({ db, input }) => {
