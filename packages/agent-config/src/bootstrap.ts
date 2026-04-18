@@ -20,7 +20,11 @@
  *          half-set-up repo.
  *        - Linked worktree → skip sync-secrets. `.worktreeinclude` at repo
  *          root runs AFTER this hook and copies `.envrc.enc`, `.dev.vars`,
- *          and `.env.op.local` in from the main checkout. Running
+ *          `.env.op.local`, and `.claude/settings.json` in from the main
+ *          checkout. (The settings.json copy overrides the version this
+ *          script just wrote — defensive against a session-start race where
+ *          Claude Code reads settings before this hook finishes; main's
+ *          version is identical content under normal operation.) Running
  *          sync-secrets here would hard-fail because those files aren't
  *          in place yet and there's usually no live `op` session.
  *

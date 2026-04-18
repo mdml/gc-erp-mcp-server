@@ -27,7 +27,7 @@ Concretely:
 
 - `scope.committed` excludes commitments where the latest patch for that commitment applied a `void` edit.
 - `NTPEvent` rows survive. `get_schedule` and dashboard schedule views continue to show them; if the scope tree or commitment state is rendered alongside, they simply dangle (pointing at an activation on a voided commitment — the UI decides whether to mark it visually).
-- `Cost` rows survive. `scope.cost` rollups still include costs that happened before the void. `scope.variance = scope.committed - scope.cost` therefore swings positive (overspend) for any scope whose voided commitments had costs — the honest answer, and the signal the operator needs to see.
+- `Cost` rows survive. `scope.cost` rollups still include costs that happened before the void. `scope.variance = scope.committed - scope.cost` therefore swings negative (overspend) for any scope whose voided commitments had costs — the honest answer, and the signal the operator needs to see.
 
 ## Options considered
 
