@@ -42,6 +42,10 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 - [ ] **Project-level commitments.** Architect, GL insurance, permitting fees often span multiple jobs. v1 puts commitments on jobs; revisit when >1 job per project exists.
 - [ ] **Contract roll-down.** Client contract is typically project-level but billing is per job. Probably a `contractRef` field on Project, pay apps still job-level.
 
+## Dev tooling
+
+- [ ] **Wire `db:seed:kitchen:local` to D1.** The script exists (root + `packages/database/db:seed:kitchen:local`) but its handler in [`packages/database/src/seed/run.ts`](../../packages/database/src/seed/run.ts) still exits 1 with "D1 provisioning pending". Seeder logic in [`packages/database/src/seed/kitchen-fixture.ts`](../../packages/database/src/seed/kitchen-fixture.ts) runs against better-sqlite3 in tests; rewiring it to local D1 follows the same shape as the activities seed — render SQL from the fixture, write to a tempfile, hand to `wrangler d1 execute gc-erp --local --file`. Reference implementation: [`packages/dev-tools/src/db/seed-activities.ts`](../../packages/dev-tools/src/db/seed-activities.ts).
+
 ## File ingestion
 
 - [ ] **R2 retention policy.** Document rows are permanent; the R2 objects may not need to be. Post-POC.
