@@ -645,8 +645,12 @@ function validatePostFoldInvariants(
  * natively; our test harness polyfills the same shape over a better-sqlite3
  * BEGIN/COMMIT (`_test-db.ts`) so both runtimes honor all-or-nothing
  * semantics per ADR 0008. The cast crosses the driver-shape gap.
+ *
+ * Exported so sibling tools that extend an `apply_patch` batch with their
+ * own writes (`record_direct_cost` appends a cost insert) submit through the
+ * same primitive — keeps the atomicity boundary in one place.
  */
-async function submitBatch(
+export async function submitBatch(
   db: DatabaseClient,
   stmts: readonly unknown[],
 ): Promise<void> {
@@ -654,6 +658,84 @@ async function submitBatch(
     batch: (qs: readonly unknown[]) => Promise<unknown[]>;
   };
   await batchable.batch(stmts);
+}
+
+// ---------------------------------------------------------------------------
+// composePatch — everything up to, but not including, the batch submit.
+//
+// Exported so `record_direct_cost` can build a patch that creates a
+// self-commitment *and* append its cost insert into the same D1 batch per
+// TOOLS.md §3.3's atomicity requirement. Callers that are just applying a
+// patch (the canonical `apply_patch` path) use the handler below, which is
+// now a thin composition of this + `submitBatch`.
+// ---------------------------------------------------------------------------
+
+export interface ComposedPatch {
+  /** The persisted Patch object — parsed, ready to return. */
+  patch: Patch;
+  /**
+   * Ordered batch statements: `[patchInsert, ...projectionStmts]`. Callers
+   * append their own statements and submit via {@link submitBatch} so the
+   * whole thing lands atomically (ADR 0008).
+   */
+  stmts: unknown[];
+}
+
+export async function composePatch(
+  db: DatabaseClient,
+  input: z.output<typeof ApplyPatchInput>,
+): Promise<ComposedPatch> {
+  const { jobId, parentPatchId, message, edits } = input;
+  const createdAt = new Date().toISOString() as IsoDate;
+
+  const refs = collectReferences(edits);
+
+  if (parentPatchId !== undefined) {
+    await validateParentPatch(db, parentPatchId, jobId);
+  }
+
+  const loaded = await loadCommitmentState(db, [...refs.commitmentIdsToLoad]);
+  await validateScopeReferences(db, refs.scopeIdsRefd, jobId);
+  validateLoadedCommitments(loaded, refs.commitmentIdsToLoad, jobId);
+  await validateNoNtpsForRemoval(db, refs.activationIdsToCheckForNtp);
+
+  const ctx: EditCtx = {
+    db,
+    jobId,
+    createdAt,
+    fold: new Map(loaded),
+    stmts: [],
+  };
+  foldEdits(ctx, edits);
+  validatePostFoldInvariants(ctx.fold);
+
+  const patchId = (await patchIdFor({
+    jobId,
+    ...(parentPatchId !== undefined ? { parentPatchId } : {}),
+    edits,
+    createdAt,
+  })) as PatchIdT;
+
+  const patchInsertStmt = db.insert(patches).values({
+    id: patchId,
+    parentPatchId: parentPatchId ?? null,
+    jobId,
+    author: null,
+    message,
+    createdAt,
+    edits: [...edits],
+  });
+
+  const patch: Patch = Patch.parse({
+    id: patchId,
+    jobId,
+    message,
+    createdAt,
+    edits,
+    ...(parentPatchId !== undefined ? { parentPatchId } : {}),
+  });
+
+  return { patch, stmts: [patchInsertStmt, ...ctx.stmts] };
 }
 
 // ---------------------------------------------------------------------------
@@ -670,56 +752,8 @@ export const applyPatch: McpToolDef<
   inputSchema: ApplyPatchInput,
   outputSchema: ApplyPatchOutput,
   handler: async ({ db, input }) => {
-    const { jobId, parentPatchId, message, edits } = input;
-    const createdAt = new Date().toISOString() as IsoDate;
-
-    const refs = collectReferences(edits);
-
-    if (parentPatchId !== undefined) {
-      await validateParentPatch(db, parentPatchId, jobId);
-    }
-
-    const loaded = await loadCommitmentState(db, [...refs.commitmentIdsToLoad]);
-    await validateScopeReferences(db, refs.scopeIdsRefd, jobId);
-    validateLoadedCommitments(loaded, refs.commitmentIdsToLoad, jobId);
-    await validateNoNtpsForRemoval(db, refs.activationIdsToCheckForNtp);
-
-    const ctx: EditCtx = {
-      db,
-      jobId,
-      createdAt,
-      fold: new Map(loaded),
-      stmts: [],
-    };
-    foldEdits(ctx, edits);
-    validatePostFoldInvariants(ctx.fold);
-
-    const patchId = (await patchIdFor({
-      jobId,
-      ...(parentPatchId !== undefined ? { parentPatchId } : {}),
-      edits,
-      createdAt,
-    })) as PatchIdT;
-
-    const patchInsertStmt = db.insert(patches).values({
-      id: patchId,
-      parentPatchId: parentPatchId ?? null,
-      jobId,
-      author: null,
-      message,
-      createdAt,
-      edits: [...edits],
-    });
-    await submitBatch(db, [patchInsertStmt, ...ctx.stmts]);
-
-    const patch: Patch = Patch.parse({
-      id: patchId,
-      jobId,
-      message,
-      createdAt,
-      edits,
-      ...(parentPatchId !== undefined ? { parentPatchId } : {}),
-    });
+    const { patch, stmts } = await composePatch(db, input);
+    await submitBatch(db, stmts);
     return { patch };
   },
 };

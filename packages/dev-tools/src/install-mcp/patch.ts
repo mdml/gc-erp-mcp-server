@@ -11,13 +11,35 @@
 export const LOCAL_ENTRY_NAME = "gc-erp-local";
 export const PROD_ENTRY_NAME = "gc-erp-prod";
 
+/**
+ * Claude Desktop's `claude_desktop_config.json` only accepts stdio entries
+ * — `type: "http"` (and similar streaming-transport shapes) is rejected as
+ * "not a valid MCP server configuration" on current Desktop. We bridge via
+ * the `mcp-remote` npm package, which proxies stdio↔HTTP + handles auth.
+ *
+ * Header encoding: `Authorization:${AUTH_HEADER}` (no space around the
+ * colon) with the full `Bearer <token>` in the `env` section dodges the
+ * Claude-Desktop-on-Windows / Cursor spaces-in-args bug. Mac tolerates the
+ * space-ful form too, but this shape is portable. See mcp-remote docs:
+ * https://github.com/geelen/mcp-remote#readme §Custom Headers.
+ *
+ * `-y` auto-accepts npx's first-run install prompt so Desktop doesn't
+ * block waiting on user input.
+ */
 export const LOCAL_ENTRY = {
-  type: "http",
-  url: "http://localhost:8787/mcp",
-  headers: {
+  command: "npx",
+  args: [
+    "-y",
+    "mcp-remote",
+    "http://localhost:8787/mcp",
+    "--header",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcp-remote interpolation marker; env below fills AUTH_HEADER at spawn time
+    "Authorization:${AUTH_HEADER}",
+  ],
+  env: {
     // Fixed local token from .dev.vars — not a secret, by design
     // (docs/guides/dogfood.md §Bearer token story).
-    Authorization: "Bearer dev",
+    AUTH_HEADER: "Bearer dev",
   },
 } as const;
 
@@ -69,13 +91,12 @@ export function serializeConfig(config: DesktopConfig): string {
 }
 
 /**
- * Prints connection instructions for the deployed Worker, never writes a
- * file. Two options, in priority order:
- *
- *   1. Claude.ai (mobile + web) — the primary prod dogfood path. Mobile
- *      cannot reach `localhost`, so prod is the only useful target there.
- *      Setup is a UI flow on claude.ai/iOS/Android, not a JSON file edit.
- *   2. Claude Desktop on Mac — pastes a JSON block into the desktop config.
+ * Prints connection instructions for the deployed Worker. Currently only
+ * Mac Claude Desktop's JSON-config path works — the in-app "Add custom
+ * connector" UI on Desktop and Claude.ai (web + mobile) is OAuth-only,
+ * with no bearer-token field. The server is bearer-only today, so those
+ * surfaces are blocked until OAuth lands on the Worker. Tracked in
+ * docs/product/backlog.md §Runtime / MCP.
  *
  * The bearer is always the literal placeholder — scripts must not
  * interpolate `$MCP_BEARER_TOKEN` (CLAUDE.md §Secrets). The user copies
@@ -86,10 +107,17 @@ export function renderProdConnectionGuide(): string {
     {
       mcpServers: {
         [PROD_ENTRY_NAME]: {
-          type: "http",
-          url: "https://gc.leiserson.me/mcp",
-          headers: {
-            Authorization: `Bearer ${PROD_BEARER_PLACEHOLDER}`,
+          command: "npx",
+          args: [
+            "-y",
+            "mcp-remote",
+            "https://gc.leiserson.me/mcp",
+            "--header",
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: literal ${AUTH_HEADER} for mcp-remote runtime expansion, not a TS template
+            "Authorization:${AUTH_HEADER}",
+          ],
+          env: {
+            AUTH_HEADER: `Bearer ${PROD_BEARER_PLACEHOLDER}`,
           },
         },
       },
@@ -99,34 +127,33 @@ export function renderProdConnectionGuide(): string {
   );
 
   return [
-    "gc-erp prod MCP — connection options",
-    "====================================",
+    "gc-erp prod MCP — connection guide",
+    "==================================",
     "",
-    "Option 1 — Claude.ai (mobile + web)   [recommended for prod dogfood]",
-    "--------------------------------------------------------------------",
-    "",
-    "Claude.ai supports remote MCP connectors directly — no file editing.",
-    "",
-    "  iOS / Android   Settings  ->  Connectors  ->  Add custom connector",
-    "  Web (claude.ai) Profile   ->  Connectors  ->  Add custom connector",
-    "",
-    `  Name:   ${PROD_ENTRY_NAME}`,
-    "  URL:    https://gc.leiserson.me/mcp",
-    `  Token:  ${PROD_BEARER_PLACEHOLDER}  (from 1Password 'gc-erp' vault)`,
-    "",
-    'After adding: open a new conversation and ask Claude to "list my jobs"',
-    "to confirm the connector is live.",
-    "",
-    "Option 2 — Claude Desktop on Mac",
-    "--------------------------------",
+    "Mac Claude Desktop  (only working path today)",
+    "---------------------------------------------",
     "",
     "Paste the JSON block below into",
     "  ~/Library/Application Support/Claude/claude_desktop_config.json",
     `(alongside any existing ${LOCAL_ENTRY_NAME} entry) and replace the`,
-    "placeholder with your MCP_BEARER_TOKEN from 1Password. Restart Claude",
-    "Desktop after editing.",
+    "placeholder with your MCP_BEARER_TOKEN from 1Password 'gc-erp' vault.",
+    "Restart Claude Desktop after editing.",
     "",
     desktopBlock,
+    "",
+    'After restart: open a new conversation and ask Claude to "list my',
+    'jobs" to confirm the connector is live.',
+    "",
+    "Claude.ai web + mobile  (not yet supported)",
+    "-------------------------------------------",
+    "",
+    'The in-app "Add custom connector" UI on Claude.ai (web + iOS + Android)',
+    "is OAuth-only — there is no bearer-token field, only OAuth Client ID +",
+    "Secret. The server currently accepts only static bearer auth, so that",
+    "flow fails. Adding OAuth (likely Cloudflare Workers OAuth Provider) is",
+    "tracked in docs/product/backlog.md §Runtime / MCP.",
+    "",
+    "Until OAuth lands: Mac Claude Desktop is the only supported prod client.",
     "",
   ].join("\n");
 }

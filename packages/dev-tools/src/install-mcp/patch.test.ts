@@ -115,36 +115,49 @@ describe("serializeConfig", () => {
 });
 
 describe("renderProdConnectionGuide", () => {
-  it("uses the literal bearer placeholder (never $MCP_BEARER_TOKEN)", () => {
+  it("uses the literal bearer placeholder (never the real MCP_BEARER_TOKEN)", () => {
     const out = renderProdConnectionGuide();
     expect(out).toContain(PROD_BEARER_PLACEHOLDER);
     expect(out).toContain("gc-erp-prod");
     expect(out).toContain("https://gc.leiserson.me/mcp");
-    // Guardrail: no env-var interpolation, no shell-substitution syntax.
-    expect(out).not.toContain("$");
+    // Guardrail: no env-var interpolation leaks the real token. The
+    // literal `${AUTH_HEADER}` is expected — it's mcp-remote's runtime
+    // substitution marker — so we check for the dangerous leak shape
+    // specifically rather than banning every `$`.
+    expect(out).not.toContain("$MCP_BEARER_TOKEN");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal leak-shape we're asserting is absent, not a template literal
+    expect(out).not.toContain("${MCP_BEARER_TOKEN}");
   });
 
-  it("leads with the Claude.ai connector flow (mobile + web)", () => {
+  it("leads with Mac Claude Desktop (only working path today)", () => {
     const out = renderProdConnectionGuide();
-    const claudeAiIdx = out.indexOf("Claude.ai");
-    const desktopIdx = out.indexOf("Claude Desktop");
-    expect(claudeAiIdx).toBeGreaterThan(-1);
+    const desktopIdx = out.indexOf("Mac Claude Desktop");
+    const claudeAiIdx = out.indexOf("Claude.ai web + mobile");
     expect(desktopIdx).toBeGreaterThan(-1);
-    // Mobile/web is the primary prod use case — must appear first.
-    expect(claudeAiIdx).toBeLessThan(desktopIdx);
+    expect(claudeAiIdx).toBeGreaterThan(-1);
+    // Desktop is the only working surface — must appear before the
+    // not-yet-supported claude.ai section.
+    expect(desktopIdx).toBeLessThan(claudeAiIdx);
   });
 
-  it("includes the in-app connector path for both iOS/Android and web", () => {
-    const out = renderProdConnectionGuide();
-    expect(out).toContain("iOS / Android");
-    expect(out).toContain("Settings");
-    expect(out).toContain("Connectors");
-  });
-
-  it("still includes the Desktop JSON block as Option 2", () => {
+  it("includes the Desktop JSON block in mcp-remote bridge shape", () => {
     const out = renderProdConnectionGuide();
     expect(out).toContain('"mcpServers"');
-    expect(out).toContain('"type": "http"');
-    expect(out).toContain(`Bearer ${PROD_BEARER_PLACEHOLDER}`);
+    // stdio-via-mcp-remote, not the Desktop-rejected type: "http" shape
+    expect(out).toContain('"command": "npx"');
+    expect(out).toContain('"mcp-remote"');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcp-remote interpolation marker, not a template literal
+    expect(out).toContain('"Authorization:${AUTH_HEADER}"');
+    // Bearer placeholder lands in env, not directly in args
+    expect(out).toContain(`"AUTH_HEADER": "Bearer ${PROD_BEARER_PLACEHOLDER}"`);
+    // Negative: the old native-HTTP shape that Desktop rejects as invalid
+    expect(out).not.toContain('"type": "http"');
+  });
+
+  it("flags the claude.ai gap and points at the backlog", () => {
+    const out = renderProdConnectionGuide();
+    expect(out).toContain("not yet supported");
+    expect(out).toContain("OAuth");
+    expect(out).toContain("backlog.md");
   });
 });

@@ -13,6 +13,8 @@ import {
   issueNtp,
   listJobs,
   listScopes,
+  recordCost,
+  recordDirectCost,
   registerToolOn,
   updateScope,
 } from "./tools";
@@ -59,6 +61,8 @@ export class GcErpMcp extends McpAgent<Env> {
     registerToolOn(this.server, ensureActivity, db);
     registerToolOn(this.server, applyPatch, db);
     registerToolOn(this.server, issueNtp, db);
+    registerToolOn(this.server, recordCost, db);
+    registerToolOn(this.server, recordDirectCost, db);
   }
   /* v8 ignore stop */
 }

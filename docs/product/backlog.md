@@ -33,6 +33,7 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 
 ## Runtime / MCP
 
+- [ ] **OAuth on the Worker — unblock claude.ai web + mobile.** The deployed server (`gc.leiserson.me/mcp`) uses static bearer auth (`MCP_BEARER_TOKEN`) and works from Mac Claude Desktop's `claude_desktop_config.json`. But the in-app "Add custom connector" UI on Claude Desktop and claude.ai (web + iOS + Android) is OAuth-only — no bearer-token field, only OAuth Client ID + Secret. Until the Worker implements OAuth (likely via Cloudflare Workers OAuth Provider — see the `cloudflare:building-mcp-server-on-cloudflare` skill for the canonical path), mobile + claude.ai web cannot connect. Big-enough decision to warrant an ADR: which OAuth provider, dynamic client registration vs. preregistered, how it composes with the existing bearer path during transition. Surfaced 2026-04-18 from [`docs/guides/dogfood.md §install:mcp:prod`](../guides/dogfood.md). Worker auth code: [`packages/mcp-server/src/index.ts`](../../packages/mcp-server/src/index.ts).
 - [ ] **Where does the server run long-term?** Local process (`npx`), hosted, or both? Affects auth and multi-device story.
 - [ ] **Which MCP app ships first.** Leaning: cost-entry form at M3, job dashboard at M4, pay app generator at M5. See [milestones.md](milestones.md).
 - [ ] **How Claude picks an app.** Return type? Explicit hints? Re-read the MCP Apps extension spec before M3.
