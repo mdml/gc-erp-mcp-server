@@ -6,7 +6,7 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Up next
 
-1. **Prod deploy.** Apply migrations `0001` + `0002`, seed 22 activities, deploy Worker. Smoke-test with `bun run scenario kitchen --target prod`. See [dogfood.md §Prod deploy checklist](../guides/dogfood.md).
+*(nothing — `feat/dogfood-prep → main` is the next action; M3 sequencing decided at next session start.)*
 
 ## In flight
 
@@ -18,6 +18,7 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Recently done
 
+- **M2 deployed to prod + end-to-end dogfood smoke** (2026-04-18): migrations `0001` + `0002` applied to remote D1, 22 activities seeded, Worker deployed at `gc.leiserson.me`, `bun run scenario kitchen --target prod` green against live infra (Day 0 → Day 60 walkthrough, full parity check). Claude Desktop connected via the mcp-remote bridge (`install:mcp:local` wired to localhost; prod entry via `install:mcp:prod`'s JSON block). `feat/dogfood-prep` carries the full surface; M2 is ready to merge to `main`.
 - **Day 60 change-order scenario landed** on `slice/day-60-scenario` (2026-04-18): `kitchen.ts` adds a CO patch against `c_frame` — `addActivation` (+$900 pantry framing) + `setPrice` ($8,500 → $9,400 lump) in one `apply_patch`, exercising ADR 0008's "invariants run post-fold, not per-edit" atomicity. New `packages/database/src/projections/foldPatches` exposes the patch-chain fold as a pure function; `assertPatchesRollupParity` in the scenario runner folds every sent patch and checks the rollup matches `get_scope_tree` — the ADR 0008 §F3.2 parity check, operationalized. PR #24 against `feat/dogfood-prep`.
 - **`record_cost` + `record_direct_cost` landed** (2026-04-18) on `slice/record-cost` (PR #23 → `feat/dogfood-prep`): TOOLS.md §3.2 (Day 14) + §3.3 (Day 18). `record_cost` is an append-only insert with cross-job + voided-commitment + activity-on-commitment + activation-belongs-to-commitment gates. `record_direct_cost` extracts a `composePatch` helper from `apply_patch` so the self-commitment + cost land in one D1 batch (ADR 0008) — atomicity test forces a batch-time cost-insert failure and asserts no orphaned commitment. 24 new tool tests + 19 existing apply_patch tests green.
 - **Dogfood script surface landed** (2026-04-18): `db:migrate:{local,prod}`, `db:seed:activities:{local,prod}`, `db:seed:kitchen:local`, `db:query:{local,prod}`, `db:reset:local`, `install:mcp:{local,prod}`, `scenario --target`. Shared plan+confirm helper; `:prod` seeding goes through a tempfile + `wrangler d1 execute --file`. Implementation in `packages/dev-tools/src/{db,install-mcp,plan-confirm,scenarios/args}.ts`; roots in `package.json`. Opens PR against `feat/dogfood-prep`.
