@@ -7,6 +7,7 @@
     "./schema": "./src/schema/index.ts",
     "./ids": "./src/ids/index.ts",
     "./invariants": "./src/invariants/index.ts",
+    "./projections": "./src/projections/index.ts",
     "./client": "./src/client.ts",
     "./seed": "./src/seed/index.ts"
   },

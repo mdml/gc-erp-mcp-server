@@ -12,7 +12,8 @@
  */
 
 import { newActivationId, newCommitmentId } from "@gc-erp/database/ids";
-import { assertEqual, assertTrue } from "./assert";
+import type { Patch } from "@gc-erp/database/schema";
+import { assertEqual, assertPatchesRollupParity, assertTrue } from "./assert";
 import type { ScenarioClient } from "./client";
 
 export interface ScenarioContext {
@@ -30,9 +31,15 @@ const CHILD_SCOPE_NAMES = [
 ] as const;
 
 export async function runKitchen(ctx: ScenarioContext): Promise<void> {
+  ctx.state.patches = [] as Patch[];
   await day0(ctx);
   await day3(ctx);
   await day10(ctx);
+  await day60(ctx);
+}
+
+function recordPatch(ctx: ScenarioContext, patch: Patch): void {
+  (ctx.state.patches as Patch[]).push(patch);
 }
 
 async function day0(ctx: ScenarioContext): Promise<void> {
@@ -274,52 +281,51 @@ async function applyFramingCommitment(
   ctx: ScenarioContext,
   args: FramingCommitmentArgs,
 ): Promise<void> {
-  const { patch } = await ctx.client.call<{ patch: { id: string } }>(
-    "apply_patch",
-    {
-      jobId: args.jobId,
-      message: "Rogelio framing contract",
-      edits: [
-        {
-          op: "create",
-          commitment: {
-            id: args.cFrameId,
-            jobId: args.jobId,
-            scopeIds: [args.scopeIds.demo, args.scopeIds.framing],
-            counterpartyId: args.partyRogelioId,
-            price: { kind: "lump", total: { cents: 850_000, currency: "USD" } },
-            activations: [
-              {
-                id: args.aDropId,
-                activityId: args.actIds.lumberDrop,
-                scopeId: args.scopeIds.demo,
-                pricePortion: { cents: 50_000, currency: "USD" },
-                leadTime: { days: 5 },
-                buildTime: { days: 1 },
-              },
-              {
-                id: args.aFrameId,
-                activityId: args.actIds.frame,
-                scopeId: args.scopeIds.framing,
-                pricePortion: { cents: 700_000, currency: "USD" },
-                leadTime: { days: 3 },
-                buildTime: { days: 3 },
-              },
-              {
-                id: args.aPunchId,
-                activityId: args.actIds.punch,
-                scopeId: args.scopeIds.demo,
-                pricePortion: { cents: 100_000, currency: "USD" },
-                leadTime: { days: 0 },
-                buildTime: { days: 1 },
-              },
-            ],
-            signedOn: "2026-04-18",
-          },
+  const { patch } = await ctx.client.call<{ patch: Patch }>("apply_patch", {
+    jobId: args.jobId,
+    message: "Rogelio framing contract",
+    edits: [
+      {
+        op: "create",
+        commitment: {
+          id: args.cFrameId,
+          jobId: args.jobId,
+          scopeIds: [args.scopeIds.demo, args.scopeIds.framing],
+          counterpartyId: args.partyRogelioId,
+          price: { kind: "lump", total: { cents: 850_000, currency: "USD" } },
+          activations: [
+            {
+              id: args.aDropId,
+              activityId: args.actIds.lumberDrop,
+              scopeId: args.scopeIds.demo,
+              pricePortion: { cents: 50_000, currency: "USD" },
+              leadTime: { days: 5 },
+              buildTime: { days: 1 },
+            },
+            {
+              id: args.aFrameId,
+              activityId: args.actIds.frame,
+              scopeId: args.scopeIds.framing,
+              pricePortion: { cents: 700_000, currency: "USD" },
+              leadTime: { days: 3 },
+              buildTime: { days: 3 },
+            },
+            {
+              id: args.aPunchId,
+              activityId: args.actIds.punch,
+              scopeId: args.scopeIds.demo,
+              pricePortion: { cents: 100_000, currency: "USD" },
+              leadTime: { days: 0 },
+              buildTime: { days: 1 },
+            },
+          ],
+          signedOn: "2026-04-18",
         },
-      ],
-    },
-  );
+      },
+    ],
+  });
+  recordPatch(ctx, patch);
+  ctx.state.pFramingId = patch.id;
   ctx.log(`  ✓ apply_patch   → ${patch.id} (c_frame created)`);
 }
 
@@ -378,4 +384,138 @@ async function day10(ctx: ScenarioContext): Promise<void> {
   ctx.log(
     `  ✓ issue_ntp     → ${ntp.id} (startBy ${startBy}, finishBy ${finishBy})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Day 60 — CO #1 adds a pantry activation to the framing contract
+// (TOOLS.md §6 Day 60; SPEC Day 60).
+//
+// Shape of the change order: one `apply_patch` with two edits against the
+// existing framing commitment:
+//   - addActivation: +$900 pantry framing, attributed to the Framing scope
+//   - setPrice: lump total moves from $8,500 → $9,400 to match the new
+//     activation sum.
+//
+// The post-fold invariant `sum(activation.pricePortion) == price.total`
+// (assertCommitmentPriceMatchesActivations) demands both edits ship in the
+// same patch — mid-fold, the commitment would be price=$8,500 with
+// activations summing to $9,400 (or vice-versa). ADR 0008's batched
+// atomicity is exactly what lets this land cleanly: invariants run against
+// post-fold state, not per-edit.
+//
+// Parity check: after the CO lands we fold every patch the scenario has
+// sent (P1 create + P7 CO) and verify the materialized `commitments` /
+// `activations` tables — as surfaced through `get_scope_tree` — roll up to
+// the same per-scope totals the fold expects. Divergence here is the
+// projection-drift bug class ADR 0008 §F3.2 calls out.
+// ---------------------------------------------------------------------------
+
+async function day60(ctx: ScenarioContext): Promise<void> {
+  ctx.log("── Day 60 — CO #1: add pantry framing (apply_patch)");
+  const jobId = ctx.state.jobId as string;
+  const cFrameId = ctx.state.cFrameId as string;
+  const pFramingId = ctx.state.pFramingId as string;
+  const rootScopeId = ctx.state.rootScopeId as string;
+  const scopeIds = await lookupScopeIdsByName(ctx, jobId);
+
+  const patch = await applyChangeOrderPatch(ctx, {
+    jobId,
+    cFrameId,
+    pFramingId,
+    framingScopeId: scopeIds.framing,
+  });
+  assertCoPatchShape(patch, pFramingId);
+  ctx.log(
+    `  ✓ apply_patch   → ${patch.id} (CO #1 landed, parent=${pFramingId})`,
+  );
+
+  const tree = await verifyDay60ScopeTree(ctx, {
+    jobId,
+    rootScopeId,
+    framingScopeId: scopeIds.framing,
+  });
+
+  // ADR 0008 §F3.2 parity check — fold ⇄ projection.
+  const patches = ctx.state.patches as Patch[];
+  assertPatchesRollupParity(patches, tree, "post-CO fold vs get_scope_tree");
+  ctx.log(
+    `  ✓ parity        → fold(${patches.length} patches) matches get_scope_tree rollups`,
+  );
+}
+
+interface ChangeOrderArgs {
+  jobId: string;
+  cFrameId: string;
+  pFramingId: string;
+  framingScopeId: string;
+}
+
+async function applyChangeOrderPatch(
+  ctx: ScenarioContext,
+  args: ChangeOrderArgs,
+): Promise<Patch> {
+  // Re-ensure the one activity this CO needs rather than leaning on Day 3's
+  // closure-captured id via ctx.state. `ensure_activity` is idempotent.
+  const { activity: frameAct } = await ctx.client.call<{
+    activity: { id: string };
+  }>("ensure_activity", { slug: "frame", name: "Frame" });
+
+  const { patch } = await ctx.client.call<{ patch: Patch }>("apply_patch", {
+    jobId: args.jobId,
+    parentPatchId: args.pFramingId,
+    message: "CO #1: add pantry framing",
+    edits: [
+      {
+        op: "addActivation",
+        commitmentId: args.cFrameId,
+        activation: {
+          id: newActivationId(),
+          activityId: frameAct.id,
+          scopeId: args.framingScopeId,
+          pricePortion: { cents: 90_000, currency: "USD" },
+          leadTime: { days: 2 },
+          buildTime: { days: 1 },
+        },
+      },
+      {
+        op: "setPrice",
+        commitmentId: args.cFrameId,
+        price: { kind: "lump", total: { cents: 940_000, currency: "USD" } },
+      },
+    ],
+  });
+  recordPatch(ctx, patch);
+  return patch;
+}
+
+function assertCoPatchShape(patch: Patch, pFramingId: string): void {
+  assertTrue(patch.id.startsWith("pat_"), "apply_patch returned a pat_ id");
+  assertTrue(
+    patch.parentPatchId === pFramingId,
+    "CO patch chains off the Day 3 framing patch",
+  );
+  assertEqual(patch.edits.length, 2, "CO patch preserved both edits");
+}
+
+async function verifyDay60ScopeTree(
+  ctx: ScenarioContext,
+  args: { jobId: string; rootScopeId: string; framingScopeId: string },
+): Promise<ScopeNodeLike[]> {
+  const { tree } = await ctx.client.call<{ tree: ScopeNodeLike[] }>(
+    "get_scope_tree",
+    { jobId: args.jobId },
+  );
+  const kitchen = findTreeNode(tree, args.rootScopeId);
+  const framing = findTreeNode(tree, args.framingScopeId);
+  assertEqual(
+    framing.committed.cents,
+    790_000,
+    "Framing.committed = 790_000 cents (frame + pantry)",
+  );
+  assertEqual(
+    kitchen.committed.cents,
+    940_000,
+    "Kitchen.committed = 940_000 cents (lump total after CO)",
+  );
+  return tree;
 }
