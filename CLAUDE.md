@@ -76,8 +76,8 @@ To change what auto-allows or denies, edit [packages/agent-config/src/policy/](p
 
 ### Runtime
 
-- Every `/mcp*` request must be bearer-authenticated before delegating to `McpAgent`. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix.
-- Constant-time token compare (`timingSafeEqual`) — don't replace with `===`. See [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md) for more.
+- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Stytch-issued JWT validated via the `stytch` SDK; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.STYTCH_PROJECT_ID` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md) and [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
+- Don't replace `timingSafeEqual` with `===` in the local-bearer path. Stytch's JWT validation handles its own timing-safety.
 - Durable Object migrations are additive. Editing an existing migration retroactively is a data-loss bug.
 
 ### Testing
@@ -117,7 +117,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 
 ### Secrets
 
-- `MCP_BEARER_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` live in 1Password (`gc-erp` vault).
+- Local-only: `MCP_BEARER_TOKEN` (fixed string `dev`). Prod-only: `STYTCH_PROJECT_ID`, `STYTCH_SECRET` (Stytch Connected Apps — see [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md)). Everywhere: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. All live in 1Password (`gc-erp` vault).
 - Never write secrets to source files, commit messages, or stdout. `.dev.vars` and `.envrc.enc` are the only legitimate on-disk homes and both are gitignored.
 - Do not run `wrangler login` — it writes a user-wide OAuth token that bleeds across repos. We use env-var auth via direnv.
 
