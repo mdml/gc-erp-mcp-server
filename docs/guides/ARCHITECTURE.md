@@ -308,7 +308,7 @@ Pointers into the roadmap — things the architecture has slots for but doesn't 
 - **MCP apps (UI components)** — [MCP Apps extension spec](https://modelcontextprotocol.io/extensions/apps/overview). First app targeted at M3 (cost-entry form).
 - **Pay-app PDF generation** — M5. Renders G702/G703 from a job's commitment + cost state. Likely a separate `packages/pay-app/` or an inline module on mcp-server.
 - **Integrations** — email ingestion for invoices, QuickBooks push, lien-waiver tracking. Milestone-dependent.
-- **Real IdP beyond Stytch defaults** — [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) adopts Stytch Connected Apps with its built-in email/password sign-in for prod OAuth. If/when we onboard users beyond Max + Salman, we can add Google / GitHub / enterprise SSO via Stytch's upstream-IdP connectors — no Worker-side code change, just Stytch dashboard config.
+- **Broader login methods beyond email OTP** — [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) adopts Stytch Connected Apps scoped to **email OTP only** (one-time 6-digit passcode). If/when we onboard users beyond Max + Salman, we can enable magic links, passwords, Google / GitHub OAuth, or enterprise SSO via Stytch's dashboard — no Worker-side code change, just a project-level toggle.
 - **CI** — no GitHub Actions yet. Pre-push + pre-commit cover local discipline; CI enters when remote collaboration does.
 - **ADR log** — [docs/decisions/](../decisions/) has the template + one seeded ADR. When a decision is non-obvious enough that we'd otherwise re-litigate it in a year, write an ADR.
 

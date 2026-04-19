@@ -22,7 +22,7 @@ Local is cheap and resettable. Prod is where the job history lives.
 The two targets use different auth mechanisms on purpose — see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) for the full rationale.
 
 - **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `packages/mcp-server/src/auth.ts`) runs only when `env.STYTCH_PROJECT_ID` is unset.
-- **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker exposes `/.well-known/oauth-authorization-server` pointing at Stytch's hosted `/register` (DCR) and `/token` endpoints plus a local `/authorize` consent page. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves, bounce the user through consent, and receive a Stytch-issued access token. The Worker validates that token as a JWT on every `/mcp*` request via the `stytch` SDK; tool handlers read the authenticated user's `claims.sub` via `getMcpAuthContext()`.
+- **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker exposes `/.well-known/oauth-authorization-server` pointing at Stytch's hosted `/register` (DCR) and `/token` endpoints plus a local `/authorize` consent page. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves, bounce the user through consent, and receive a Stytch-issued access token. The Worker validates that token as a JWT on every `/mcp*` request via the `stytch` SDK; tool handlers read the authenticated user's `claims.sub` via `getMcpAuthContext()`. The Stytch project is configured to offer **email OTP only** — the consent UI asks for an email, emails a 6-digit code, and accepts the code back. No magic links, no passwords, no social logins, no SSO (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) §"Login-method scope").
 
 **Why the split:** claude.ai Custom Connectors on web + iOS + Android reject static bearer headers — they implement the MCP OAuth spec strictly. Claude Desktop historically accepted bearer headers, but with OAuth available it should use OAuth too (cleaner, per-user identity, works across all Claude surfaces). Local stays on bearer because the scenario runner is server-to-server and OAuth'ing every script invocation adds setup cost for no real security benefit — local D1 has no real data.
 
@@ -181,7 +181,7 @@ The output prints this JSON block for `~/Library/Application Support/Claude/clau
 }
 ```
 
-Paste it in and restart Claude Desktop. On first connection Desktop pops a browser window to `https://gc.leiserson.me/authorize`, which renders a Stytch-backed consent page; sign in with your email (magic link — no password to store), approve, and Desktop receives the access token. The token is refreshed automatically on expiration.
+Paste it in and restart Claude Desktop. On first connection Desktop pops a browser window to `https://gc.leiserson.me/authorize`, which renders a Stytch-backed consent page; enter your email, receive a 6-digit one-time passcode in your inbox, type it back into the consent page (no password to remember, no social login), approve, and Desktop receives the access token. The token is refreshed automatically on expiration.
 
 Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
 
@@ -196,7 +196,7 @@ Claude iOS, Android, and web support remote MCP connectors. In-app: **Settings �
 - **URL:** `https://gc.leiserson.me/mcp`
 - **Auth:** leave blank. claude.ai's Custom Connectors only speak OAuth 2.1 + DCR — there's no field for a static bearer token, and that's the reason we adopted Stytch (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)).
 
-On first connection, claude.ai fetches `/.well-known/oauth-authorization-server`, registers itself via DCR, redirects you to the Stytch-backed consent page (magic-link sign-in via your email), and caches the access token. Subsequent sessions refresh silently.
+On first connection, claude.ai fetches `/.well-known/oauth-authorization-server`, registers itself via DCR, redirects you to the Stytch-backed consent page, and once you've signed in via email OTP (6-digit passcode to your inbox), caches the access token. Subsequent sessions refresh silently.
 
 Local dev is not useful from mobile (localhost doesn't resolve on mobile networks). Prod-only on mobile is the right setup.
 
@@ -225,7 +225,11 @@ Run these in order. Each is independently safe to retry.
 
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
-3. Verify Stytch OAuth secrets are in place (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)): `STYTCH_PROJECT_ID` + `STYTCH_SECRET` uploaded via `wrangler secret put …`; Stytch dashboard has Connected Apps enabled with `https://gc.leiserson.me/authorize/callback` registered as an allowed redirect URL. No `MCP_BEARER_TOKEN` in prod secrets.
+3. Verify Stytch OAuth secrets + login-method config are in place (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)):
+   - `STYTCH_PROJECT_ID` + `STYTCH_SECRET` uploaded via `wrangler secret put …`;
+   - Stytch dashboard has Connected Apps enabled with `https://gc.leiserson.me/authorize/callback` registered as an allowed redirect URL;
+   - Login methods on the Stytch project are restricted to **email OTP only** — magic links, passwords, social logins (Google / GitHub), WebAuthn, and enterprise SSO are all disabled;
+   - No `MCP_BEARER_TOKEN` in prod Cloudflare secrets.
 4. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
 5. Verify the seed:
    ```bash
