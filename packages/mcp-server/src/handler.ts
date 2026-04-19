@@ -34,7 +34,7 @@ const METHOD_NOT_ALLOWED = (allow: string): Response =>
   });
 
 function isProdMode(env: Env): boolean {
-  return Boolean(env.CLERK_SECRET_KEY);
+  return Boolean(env.CLERK_SECRET_KEY && env.CLERK_PUBLISHABLE_KEY);
 }
 
 function jsonResponse(body: object, cacheSeconds = 300): Response {
@@ -58,17 +58,26 @@ function unauthorized(env: Env): Response {
   });
 }
 
+// Discovery-doc + protected-resource metadata ported from
+// @clerk/mcp-tools' authServerMetadataHandlerClerk + protectedResourceHandlerClerk.
+// Source: https://github.com/clerk/mcp-tools/blob/main/src/express/index.ts
 async function handleDiscovery(req: Request, env: Env): Promise<Response> {
   if (!isProdMode(env)) return NOT_FOUND();
   if (req.method !== "GET") return METHOD_NOT_ALLOWED("GET");
-  // isProdMode verifies CLERK_SECRET_KEY is set; CLERK_PUBLISHABLE_KEY is
-  // always set alongside (sync-secrets guarantees both flow from the same
-  // Clerk instance).
   const publishableKey = env.CLERK_PUBLISHABLE_KEY as string;
   const fapiUrl = deriveFapiUrl(publishableKey);
-  const upstream = await fetch(
-    `${fapiUrl}/.well-known/oauth-authorization-server`,
-  );
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${fapiUrl}/.well-known/oauth-authorization-server`);
+  } catch {
+    return new Response(JSON.stringify({ error: "upstream_unavailable" }), {
+      status: 502,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
   return new Response(await upstream.text(), {
     status: upstream.status,
     headers: {
@@ -147,6 +156,7 @@ async function authenticateClerk(
   env: Env,
   validator: ClerkValidator,
 ): Promise<ClerkAuth | null> {
+  // fast-path: skip the Clerk SDK construction on obviously malformed headers
   if (!authHeader.startsWith("Bearer ")) return null;
   if (!authHeader.slice("Bearer ".length)) return null;
   try {
