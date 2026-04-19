@@ -20,9 +20,11 @@ import {
 } from "./tools";
 
 interface Env {
-  MCP_BEARER_TOKEN: string;
+  MCP_BEARER_TOKEN?: string;
   MCP_OBJECT: DurableObjectNamespace;
   DB: D1Database;
+  STYTCH_PROJECT_ID?: string;
+  STYTCH_SECRET?: string;
 }
 
 export class GcErpMcp extends McpAgent<Env> {

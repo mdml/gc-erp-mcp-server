@@ -43,9 +43,6 @@ export const LOCAL_ENTRY = {
   },
 } as const;
 
-/** Prod bearer is never interpolated — always the literal placeholder. */
-export const PROD_BEARER_PLACEHOLDER = "<your MCP_BEARER_TOKEN>";
-
 /**
  * Shape matches Claude Desktop's `claude_desktop_config.json`. Additional
  * top-level keys beyond `mcpServers` are preserved verbatim — we don't
@@ -91,34 +88,24 @@ export function serializeConfig(config: DesktopConfig): string {
 }
 
 /**
- * Prints connection instructions for the deployed Worker. Currently only
- * Mac Claude Desktop's JSON-config path works — the in-app "Add custom
- * connector" UI on Desktop and Claude.ai (web + mobile) is OAuth-only,
- * with no bearer-token field. The server is bearer-only today, so those
- * surfaces are blocked until OAuth lands on the Worker. Tracked in
- * docs/product/backlog.md §Runtime / MCP.
+ * Prints connection instructions for the deployed Worker. Prod uses Stytch
+ * Connected Apps for OAuth 2.1 + DCR (see ADR 0010), so Claude Desktop,
+ * iOS, Android, and claude.ai web all connect through the same flow —
+ * `mcp-remote` bridges Desktop's stdio transport to the Worker's streamable
+ * HTTP endpoint and handles the OAuth dance natively (DCR → browser consent
+ * with email OTP → cached token at `~/.mcp-auth/`, refreshed on expiry).
  *
- * The bearer is always the literal placeholder — scripts must not
- * interpolate `$MCP_BEARER_TOKEN` (CLAUDE.md §Secrets). The user copies
- * the real token from 1Password `gc-erp` vault by hand.
+ * No bearer is interpolated. The absolute `command` path + pinned `PATH`
+ * works around Desktop's launch-services PATH not including Homebrew/nvm.
  */
 export function renderProdConnectionGuide(): string {
   const desktopBlock = JSON.stringify(
     {
       mcpServers: {
         [PROD_ENTRY_NAME]: {
-          command: "npx",
-          args: [
-            "-y",
-            "mcp-remote",
-            "https://gc.leiserson.me/mcp",
-            "--header",
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: literal ${AUTH_HEADER} for mcp-remote runtime expansion, not a TS template
-            "Authorization:${AUTH_HEADER}",
-          ],
-          env: {
-            AUTH_HEADER: `Bearer ${PROD_BEARER_PLACEHOLDER}`,
-          },
+          command: "/opt/homebrew/bin/npx",
+          args: ["-y", "mcp-remote", "https://gc.leiserson.me/mcp"],
+          env: { PATH: "/opt/homebrew/bin:/usr/bin:/bin" },
         },
       },
     },
@@ -130,30 +117,31 @@ export function renderProdConnectionGuide(): string {
     "gc-erp prod MCP — connection guide",
     "==================================",
     "",
-    "Mac Claude Desktop  (only working path today)",
-    "---------------------------------------------",
+    "Mac Claude Desktop",
+    "------------------",
     "",
     "Paste the JSON block below into",
     "  ~/Library/Application Support/Claude/claude_desktop_config.json",
-    `(alongside any existing ${LOCAL_ENTRY_NAME} entry) and replace the`,
-    "placeholder with your MCP_BEARER_TOKEN from 1Password 'gc-erp' vault.",
-    "Restart Claude Desktop after editing.",
+    `(alongside any existing ${LOCAL_ENTRY_NAME} entry) and restart Claude`,
+    "Desktop. On first connection `mcp-remote` pops a browser window to the",
+    "Stytch consent page; enter your email, receive a 6-digit passcode, type",
+    "it back into the consent page. No password, no token to paste.",
     "",
     desktopBlock,
     "",
     'After restart: open a new conversation and ask Claude to "list my',
     'jobs" to confirm the connector is live.',
     "",
-    "Claude.ai web + mobile  (not yet supported)",
-    "-------------------------------------------",
+    "Claude.ai web + iOS + Android",
+    "-----------------------------",
     "",
-    'The in-app "Add custom connector" UI on Claude.ai (web + iOS + Android)',
-    "is OAuth-only — there is no bearer-token field, only OAuth Client ID +",
-    "Secret. The server currently accepts only static bearer auth, so that",
-    "flow fails. Adding OAuth (likely Cloudflare Workers OAuth Provider) is",
-    "tracked in docs/product/backlog.md §Runtime / MCP.",
+    "Settings → Connectors → Add custom connector.",
+    "  URL:  https://gc.leiserson.me/mcp",
+    "  Auth: leave blank (OAuth handled in-app).",
     "",
-    "Until OAuth lands: Mac Claude Desktop is the only supported prod client.",
+    "On first connection claude.ai fetches the discovery document, registers",
+    "itself via DCR, redirects to the Stytch consent page (email OTP), and",
+    "caches the access token. Subsequent sessions refresh silently.",
     "",
   ].join("\n");
 }

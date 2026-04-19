@@ -10,7 +10,9 @@
   "globalPassThroughEnv": [
     "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID",
-    "OP_SERVICE_ACCOUNT_TOKEN"
+    "OP_SERVICE_ACCOUNT_TOKEN",
+    "STYTCH_PROJECT_ID",
+    "STYTCH_SECRET"
   ],
   "tasks": {
     "dev": {

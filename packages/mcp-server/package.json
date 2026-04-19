@@ -19,6 +19,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "agents": "0.11.0",
     "drizzle-orm": "0.45.2",
+    "stytch": "14.0.0",
     "zod": "4.3.6"
   },
   "devDependencies": {

@@ -60,6 +60,19 @@ export const teamSecrets: TeamSecret[] = [
     // gets the literal `dev` from `localDevVars` below — see file header.
     targets: ["envrc"],
   },
+  {
+    // Stytch OAuth project credentials (ADR 0010). envrc-only — local mode
+    // is deliberately gated on the ABSENCE of STYTCH_PROJECT_ID, so these
+    // must never land in .dev.vars.
+    name: "STYTCH_PROJECT_ID",
+    opRef: "op://gc-erp/stytch/project-id",
+    targets: ["envrc"],
+  },
+  {
+    name: "STYTCH_SECRET",
+    opRef: "op://gc-erp/stytch/secret",
+    targets: ["envrc"],
+  },
 ];
 
 /**
