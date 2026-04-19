@@ -140,6 +140,11 @@ function backupPath(path: string): string {
 }
 
 async function main(): Promise<void> {
+  if (process.platform !== "darwin") {
+    throw new Error(
+      `unsupported platform '${process.platform}' — Claude Desktop config lives at a macOS-specific path (~/Library/Application Support/Claude/). Add Linux/Windows support before running this on a non-macOS host.`,
+    );
+  }
   const argv = process.argv.slice(2);
   const remove = argv.includes("--remove");
   const path = configPath();
