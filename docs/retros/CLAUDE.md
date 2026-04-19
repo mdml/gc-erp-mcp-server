@@ -45,11 +45,14 @@ One line per entry. Date prefix, terse phrasing, enough context that it's readab
 
 1. **Read `draft.md`.** These are the candidate topics.
 2. **Gather fresh signal.** `git log --oneline -20`; skim the last 2–3 dated retros for carryover.
-3. **Ask Max** which threads from `draft.md` to pull on. 3–5 targeted questions, not a survey.
-4. **Propose a timebox** — a small ordered list of what this retro will produce this session. Confirm before editing.
-5. **Make the changes** the retro calls for (doc updates, backlog entries, ADRs).
-6. **Log the retro** at `docs/retros/YYYY-MM-DD-<slug>.md` using the [template](#template). Slug: 2–4 kebab-case words describing the theme.
-7. **Prune `draft.md`.** Remove entries that were addressed (either rolled into the retro or explicitly dropped). Leave anything still open for the next retro.
+3. **Sweep for hygiene drift.** Check the two debt registers for entries that have aged out — each one that can be removed is a candidate decision for this retro:
+   - **[`osv-scanner.toml`](../../osv-scanner.toml)** — for every `[[IgnoredVulns]]` entry: has `ignoreUntil` passed? Has the upstream fix shipped (check the advisory URL and the affected package's latest version via `bun pm view <pkg> version` or the advisory page)? Is the original justification still true (e.g., "drizzle-kit is devDependency-only" — confirm it still is)? If any answer has changed, the entry can likely be removed or the dep bumped.
+   - **[`bunfig.toml`](../../bunfig.toml)** `minimumReleaseAgeExcludes` — for every package on the excludes list: is the currently-locked version older than 7 days? (`bun pm view <pkg> time` shows publish dates; compare against `bun pm ls <pkg>`.) If the locked version has aged out of the quarantine window, the package can come off the excludes list. The comment in `bunfig.toml` makes this explicit: "Trim this list once the locked version ages out."
+4. **Ask Max** which threads from `draft.md` (and the hygiene sweep) to pull on. 3–5 targeted questions, not a survey.
+5. **Propose a timebox** — a small ordered list of what this retro will produce this session. Confirm before editing.
+6. **Make the changes** the retro calls for (doc updates, backlog entries, ADRs, `osv-scanner.toml` / `bunfig.toml` edits).
+7. **Log the retro** at `docs/retros/YYYY-MM-DD-<slug>.md` using the [template](#template). Slug: 2–4 kebab-case words describing the theme.
+8. **Prune `draft.md`.** Remove entries that were addressed (either rolled into the retro or explicitly dropped). Leave anything still open for the next retro.
 
 ## Style
 
