@@ -422,6 +422,31 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
     expect(res.headers.get("allow")).toContain("GET");
   });
 
+  it("upstream Clerk FAPI returns non-2xx → status passes through with cache-control: no-store", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("upstream boom", {
+        status: 500,
+        headers: { "content-type": "text/plain" },
+      }),
+    );
+    try {
+      const fetch = makeFetchHandler(stubMcp());
+      const res = await fetch(
+        new Request(
+          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+          { method: "GET" },
+        ),
+        makeProdEnv(),
+        ctx,
+      );
+      expect(res.status).toBe(500);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(await res.text()).toBe("upstream boom");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("upstream Clerk FAPI unreachable → 502 with cache-control: no-store", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")

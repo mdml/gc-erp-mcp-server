@@ -84,7 +84,10 @@ async function handleDiscovery(req: Request, env: Env): Promise<Response> {
       "content-type":
         upstream.headers.get("content-type") ??
         "application/json; charset=utf-8",
-      "cache-control": "public, max-age=300",
+      // no-store on non-2xx: preserve the upstream status for diagnostic
+      // value but never let an edge cache pin a transient Clerk-origin
+      // error as the discovery doc.
+      "cache-control": upstream.ok ? "public, max-age=300" : "no-store",
     },
   });
 }
