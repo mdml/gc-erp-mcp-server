@@ -192,8 +192,6 @@ Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` a
 
 **If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON, (b) your Stytch project has Connected Apps enabled, the redirect URL is registered, and email OTP is enabled as a login method, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
 
-> ⚠️ **Transitional state.** The above describes the target post-Stytch flow. Until the Stytch coding slice lands (tracked as [now.md](../product/now.md) #1), the `install:mcp:prod` script still emits a bearer-based block and prod is reachable only from Mac Claude Desktop via static bearer — claude.ai web + mobile connectors can't connect. After the slice lands, this doc matches the code.
-
 ## Claude.ai Connectors (mobile / web)
 
 Claude iOS, Android, and web support remote MCP connectors. In-app: **Settings → Connectors → Add custom connector**.

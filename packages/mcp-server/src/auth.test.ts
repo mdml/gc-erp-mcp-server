@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timingSafeEqual } from "./auth";
+import { stytchPublicBase, timingSafeEqual } from "./auth";
 
 describe("timingSafeEqual", () => {
   it("returns true for identical strings", () => {
@@ -18,5 +18,25 @@ describe("timingSafeEqual", () => {
 
   it("returns true for two empty strings", () => {
     expect(timingSafeEqual("", "")).toBe(true);
+  });
+});
+
+describe("stytchPublicBase", () => {
+  it("routes project-test-* to test.stytch.com", () => {
+    expect(stytchPublicBase("project-test-abc")).toBe(
+      "https://test.stytch.com/v1/public/project-test-abc",
+    );
+  });
+
+  it("routes project-live-* to api.stytch.com", () => {
+    expect(stytchPublicBase("project-live-xyz")).toBe(
+      "https://api.stytch.com/v1/public/project-live-xyz",
+    );
+  });
+
+  it("defaults to test.stytch.com for unknown prefixes (safer than guessing prod)", () => {
+    expect(stytchPublicBase("project-sandbox-foo")).toBe(
+      "https://test.stytch.com/v1/public/project-sandbox-foo",
+    );
   });
 });

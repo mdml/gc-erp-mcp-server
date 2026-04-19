@@ -5,7 +5,6 @@ import {
   backupTimestamp,
   LOCAL_ENTRY,
   LOCAL_ENTRY_NAME,
-  PROD_BEARER_PLACEHOLDER,
   removeLocalEntry,
   renderProdConnectionGuide,
   serializeConfig,
@@ -115,49 +114,42 @@ describe("serializeConfig", () => {
 });
 
 describe("renderProdConnectionGuide", () => {
-  it("uses the literal bearer placeholder (never the real MCP_BEARER_TOKEN)", () => {
+  it("emits an OAuth-native Desktop block — no bearer, no AUTH_HEADER, no --header", () => {
     const out = renderProdConnectionGuide();
-    expect(out).toContain(PROD_BEARER_PLACEHOLDER);
     expect(out).toContain("gc-erp-prod");
     expect(out).toContain("https://gc.leiserson.me/mcp");
-    // Guardrail: no env-var interpolation leaks the real token. The
-    // literal `${AUTH_HEADER}` is expected — it's mcp-remote's runtime
-    // substitution marker — so we check for the dangerous leak shape
-    // specifically rather than banning every `$`.
-    expect(out).not.toContain("$MCP_BEARER_TOKEN");
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal leak-shape we're asserting is absent, not a template literal
-    expect(out).not.toContain("${MCP_BEARER_TOKEN}");
+    // No bearer interpolation anywhere — OAuth is handled by mcp-remote
+    // natively, so the prod entry carries no token at all.
+    expect(out).not.toContain("Bearer");
+    expect(out).not.toContain("AUTH_HEADER");
+    expect(out).not.toContain("--header");
+    expect(out).not.toContain("MCP_BEARER_TOKEN");
   });
 
-  it("leads with Mac Claude Desktop (only working path today)", () => {
-    const out = renderProdConnectionGuide();
-    const desktopIdx = out.indexOf("Mac Claude Desktop");
-    const claudeAiIdx = out.indexOf("Claude.ai web + mobile");
-    expect(desktopIdx).toBeGreaterThan(-1);
-    expect(claudeAiIdx).toBeGreaterThan(-1);
-    // Desktop is the only working surface — must appear before the
-    // not-yet-supported claude.ai section.
-    expect(desktopIdx).toBeLessThan(claudeAiIdx);
-  });
-
-  it("includes the Desktop JSON block in mcp-remote bridge shape", () => {
+  it("includes the Desktop JSON block in mcp-remote bridge shape with absolute npx", () => {
     const out = renderProdConnectionGuide();
     expect(out).toContain('"mcpServers"');
-    // stdio-via-mcp-remote, not the Desktop-rejected type: "http" shape
-    expect(out).toContain('"command": "npx"');
+    // Absolute path + pinned PATH — Desktop's launch-services PATH doesn't
+    // include Homebrew/nvm by default (same caveat as install:mcp:local).
+    expect(out).toContain('"command": "/opt/homebrew/bin/npx"');
     expect(out).toContain('"mcp-remote"');
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcp-remote interpolation marker, not a template literal
-    expect(out).toContain('"Authorization:${AUTH_HEADER}"');
-    // Bearer placeholder lands in env, not directly in args
-    expect(out).toContain(`"AUTH_HEADER": "Bearer ${PROD_BEARER_PLACEHOLDER}"`);
+    expect(out).toContain("/opt/homebrew/bin:/usr/bin:/bin");
     // Negative: the old native-HTTP shape that Desktop rejects as invalid
     expect(out).not.toContain('"type": "http"');
   });
 
-  it("flags the claude.ai gap and points at the backlog", () => {
+  it("documents the Stytch email-OTP consent flow for Desktop", () => {
     const out = renderProdConnectionGuide();
-    expect(out).toContain("not yet supported");
-    expect(out).toContain("OAuth");
-    expect(out).toContain("backlog.md");
+    expect(out).toContain("Stytch consent page");
+    expect(out).toMatch(/email/i);
+    expect(out).toMatch(/6-digit|passcode|OTP/i);
+  });
+
+  it("includes a claude.ai Connectors section (now supported via OAuth)", () => {
+    const out = renderProdConnectionGuide();
+    expect(out).toContain("Claude.ai");
+    expect(out).toMatch(/Connectors|connector/);
+    // No longer blocked — remove the old "not yet supported" framing.
+    expect(out).not.toContain("not yet supported");
   });
 });
