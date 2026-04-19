@@ -208,6 +208,40 @@ describe("/mcp — local mode (no CLERK_SECRET_KEY)", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("partial Clerk config (only CLERK_SECRET_KEY) falls into local mode: discovery 404s", async () => {
+    const fetch = makeFetchHandler(stubMcp());
+    const res = await fetch(
+      new Request(
+        "https://example.com/.well-known/oauth-authorization-server",
+        { method: "GET" },
+      ),
+      {
+        MCP_OBJECT: {} as unknown as DurableObjectNamespace,
+        DB: {} as unknown as D1Database,
+        CLERK_SECRET_KEY: "sk_live_test-secret",
+      },
+      ctx,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("partial Clerk config (only CLERK_PUBLISHABLE_KEY) falls into local mode: discovery 404s", async () => {
+    const fetch = makeFetchHandler(stubMcp());
+    const res = await fetch(
+      new Request(
+        "https://example.com/.well-known/oauth-authorization-server",
+        { method: "GET" },
+      ),
+      {
+        MCP_OBJECT: {} as unknown as DurableObjectNamespace,
+        DB: {} as unknown as D1Database,
+        CLERK_PUBLISHABLE_KEY: TEST_PUBLISHABLE_KEY,
+      },
+      ctx,
+    );
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("/mcp — prod mode (CLERK_SECRET_KEY set)", () => {
@@ -386,6 +420,29 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
     );
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toContain("GET");
+  });
+
+  it("upstream Clerk FAPI unreachable → 502 with cache-control: no-store", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new Error("network"));
+    try {
+      const fetch = makeFetchHandler(stubMcp());
+      const res = await fetch(
+        new Request(
+          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+          { method: "GET" },
+        ),
+        makeProdEnv(),
+        ctx,
+      );
+      expect(res.status).toBe(502);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toEqual({ error: "upstream_unavailable" });
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

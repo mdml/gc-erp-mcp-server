@@ -23,7 +23,6 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@clerk/mcp-tools": "0.3.1",
     "@cloudflare/workers-types": "4.20260415.1",
     "@types/better-sqlite3": "7.6.13",
     "@vitest/coverage-v8": "4.1.4",
