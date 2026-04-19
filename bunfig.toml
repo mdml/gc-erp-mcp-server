@@ -14,5 +14,8 @@ minimumReleaseAge = 604800
 minimumReleaseAgeExcludes = [
   "@cloudflare/workers-types",
   "agents",
+  # Stytch ships frequently; we track latest v14 deliberately. Trim once
+  # 14.x stabilizes and the next minor ages out.
+  "stytch",
   "wrangler",
 ]
