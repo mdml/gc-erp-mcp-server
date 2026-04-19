@@ -21,7 +21,7 @@ Local is cheap and resettable. Prod is where the job history lives.
 
 Both targets share the same env-var name (`MCP_BEARER_TOKEN`) and the server checks it on every request — but the values have different weight:
 
-- **Local:** the fixed string `dev`. Hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes `Authorization: Bearer dev` directly into the Desktop config — no secret lookup, nothing sensitive in the file.
+- **Local:** the fixed string `dev`. Sourced from [`localDevVars`](../../packages/dev-tools/src/secrets.config.ts) in `secrets.config.ts`; written to `.dev.vars` on every `bun run sync-secrets`. Not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes `Authorization: Bearer dev` directly into the Desktop config — no secret lookup, nothing sensitive in the file. **Note:** `localDevVars` overrides any 1Password-sourced value of the same name, so the prod token can never accidentally leak into local `.dev.vars`.
 - **Prod:** a real random secret stored in 1Password `gc-erp` vault → decrypted into `.envrc.enc` → loaded by `direnv` on shell entry. Available in your terminal as `$MCP_BEARER_TOKEN` whenever `direnv` is active. Never printed to stdout by any script.
 
 The auth code path is exercised in both environments (invariant: every `/mcp*` request is bearer-checked). The local token is trivial by design — local D1 holds no real data, so there is nothing worth protecting. The prod token is real and treated accordingly.
@@ -141,7 +141,7 @@ The entry it writes:
 {
   "mcpServers": {
     "gc-erp-local": {
-      "command": "/absolute/path/to/npx",
+      "command": "/opt/homebrew/bin/npx",
       "args": [
         "-y",
         "mcp-remote",
@@ -150,16 +150,19 @@ The entry it writes:
         "Authorization:${AUTH_HEADER}"
       ],
       "env": {
-        "AUTH_HEADER": "Bearer dev"
+        "AUTH_HEADER": "Bearer dev",
+        "PATH": "/opt/homebrew/bin:/usr/bin:/bin"
       }
     }
   }
 }
 ```
 
-Why the `${AUTH_HEADER}` indirection: `mcp-remote` parses `--header` values verbatim, and a bare `"Bearer dev"` with a space confuses its argv parsing on some Desktop versions. Wrapping the token in an env var — passed through `env` — sidesteps the issue.
+Why `${AUTH_HEADER}` indirection: `mcp-remote` parses `--header` values verbatim, and a bare `"Bearer dev"` with a space confuses its argv parsing on some Desktop versions. Wrapping the token in an env var — passed through `env` — sidesteps the issue.
 
-The token `dev` is the fixed local value from `.dev.vars`. It is not a secret — nothing in local D1 warrants protection.
+Why pin `PATH`: pinning `command` to `/opt/homebrew/bin/npx` alone isn't enough — `npx` is a `#!/usr/bin/env node` script, so it re-resolves `node` from PATH at runtime. Without an explicit `PATH` in `env`, the spawned process inherits Desktop's launch-services PATH and may resolve `node` to a stale nvm Node 16 — so Homebrew's `npx` ends up running on Node 16 anyway. Setting `PATH` to the npx's sibling bindir keeps `node`, `npm`, and any shebang in the spawned process tree on the same Homebrew install.
+
+The token `dev` is the fixed local value from `.dev.vars` (sourced from `localDevVars` in [packages/dev-tools/src/secrets.config.ts](../../packages/dev-tools/src/secrets.config.ts) on every `bun run sync-secrets`). It is not a secret — nothing in local D1 warrants protection.
 
 #### Node version caveat
 

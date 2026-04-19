@@ -29,7 +29,16 @@ describe("buildLocalEntry", () => {
 
   it("passes the bearer token via env, not inline in --header (mcp-remote argv quirk)", () => {
     const entry = buildLocalEntry("/opt/homebrew/bin/npx");
-    expect(entry.env).toEqual({ AUTH_HEADER: LOCAL_BEARER });
+    expect(entry.env?.AUTH_HEADER).toBe(LOCAL_BEARER);
+  });
+
+  it("pins PATH to the npx's sibling bindir so node + shebangs resolve consistently", () => {
+    expect(buildLocalEntry("/opt/homebrew/bin/npx").env?.PATH).toBe(
+      "/opt/homebrew/bin:/usr/bin:/bin",
+    );
+    expect(buildLocalEntry("/usr/local/bin/npx").env?.PATH).toBe(
+      "/usr/local/bin:/usr/bin:/bin",
+    );
   });
 });
 

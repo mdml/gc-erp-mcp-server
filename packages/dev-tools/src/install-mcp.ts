@@ -13,7 +13,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { writeAtomic } from "./io";
 
 export const SERVER_NAME = "gc-erp-local";
@@ -35,6 +35,14 @@ export interface DesktopConfig {
  * Build the `gc-erp-local` server entry. The `${AUTH_HEADER}` indirection in
  * --header keeps `mcp-remote`'s argv parser happy (a bare "Bearer dev" with a
  * space confuses it on some Desktop versions).
+ *
+ * Why we set `PATH`: `npx` is a `#!/usr/bin/env node` script, so it
+ * re-resolves `node` from PATH at runtime. Pinning `command` to
+ * /opt/homebrew/bin/npx alone isn't enough — Desktop's inherited
+ * launch-services PATH may still surface a stale nvm Node 16 first, and
+ * Homebrew's npx will run on that. We explicitly seed PATH with the npx's
+ * sibling bindir so `node`, `npm`, and any `#!/usr/bin/env node` shebang in
+ * the spawned process tree resolves to the same Homebrew install.
  */
 export function buildLocalEntry(npxPath: string): McpServerEntry {
   return {
@@ -47,7 +55,10 @@ export function buildLocalEntry(npxPath: string): McpServerEntry {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: literal string — mcp-remote performs the env-var substitution at runtime.
       "Authorization:${AUTH_HEADER}",
     ],
-    env: { AUTH_HEADER: LOCAL_BEARER },
+    env: {
+      AUTH_HEADER: LOCAL_BEARER,
+      PATH: `${dirname(npxPath)}:/usr/bin:/bin`,
+    },
   };
 }
 
