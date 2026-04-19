@@ -10,7 +10,7 @@ Two targets exist; all tooling is aware of both.
 | **URL** | `http://localhost:8787/mcp` | `https://gc.leiserson.me/mcp` |
 | **Runtime** | `wrangler dev` (hot-reload) | Deployed Cloudflare Worker |
 | **Database** | Local D1 file — `.wrangler/state/v3/d1/` | Live D1 (`gc-erp`) in Cloudflare |
-| **Auth** | Static bearer — `MCP_BEARER_TOKEN=dev` from `.dev.vars` | **OAuth 2.1 + DCR via Stytch Connected Apps** (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)) |
+| **Auth** | Static bearer — `MCP_BEARER_TOKEN=dev` from `.dev.vars` | **OAuth 2.1 + DCR via Clerk** (hosted consent — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)) |
 | **Cost to touch** | Free — no real data at risk | Real data; writes are permanent |
 | **When to use** | Tool development, scenario runs, iteration | Actual GC work, dogfood sessions, client config |
 
@@ -19,14 +19,14 @@ Local is cheap and resettable. Prod is where the job history lives.
 
 ## Auth story
 
-The two targets use different auth mechanisms on purpose — see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) for the full rationale.
+The two targets use different auth mechanisms on purpose — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) for the full rationale.
 
-- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `packages/mcp-server/src/auth.ts`) runs only when `env.STYTCH_PROJECT_ID` is unset.
-- **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker exposes `/.well-known/oauth-authorization-server` pointing at Stytch's hosted `/register` (DCR) and `/token` endpoints plus a local `/authorize` consent page. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves, bounce the user through consent, and receive a Stytch-issued access token. The Worker validates that token as a JWT on every `/mcp*` request via the `stytch` SDK; tool handlers read the authenticated user's `claims.sub` via `getMcpAuthContext()`. The Stytch project is configured to offer **email OTP only** — the consent UI asks for an email, emails a 6-digit code, and accepts the code back. No magic links, no passwords, no social logins, no SSO (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) §"Login-method scope").
+- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `packages/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
+- **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker proxies Clerk's `/.well-known/oauth-authorization-server` discovery doc (pointing clients at Clerk's hosted `/oauth/authorize`, `/oauth/token`, `/oauth/register`) and serves its own Clerk-shaped `/.well-known/oauth-protected-resource` metadata. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves via DCR, **redirect through Clerk's hosted consent page** (Clerk hosts the sign-in + scope approval UI — the Worker never renders one), and receive a Clerk-minted access token. The Worker validates that JWT on every `/mcp*` request via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; tool handlers read `userId` / `scopes` / `clientId` via `getMcpAuthContext().auth`.
 
 **Why the split:** claude.ai Custom Connectors on web + iOS + Android reject static bearer headers — they implement the MCP OAuth spec strictly. Claude Desktop historically accepted bearer headers, but with OAuth available it should use OAuth too (cleaner, per-user identity, works across all Claude surfaces). Local stays on bearer because the scenario runner is server-to-server and OAuth'ing every script invocation adds setup cost for no real security benefit — local D1 has no real data.
 
-Scripts that talk to prod (e.g. `scenario kitchen --target prod`) acquire a Stytch access token once (via the `scenario auth` helper — deferred to the coding slice per [now.md](../product/now.md) item 1) and cache it in a gitignored token file. If a script needs a token and none is cached, it should fail loudly with a message telling the operator to run `scenario auth`.
+Scripts that talk to prod (e.g. `scenario kitchen --target prod`) acquire a Clerk-minted access token once (via the `scenario auth` helper — deferred to a future coding slice) and cache it in a gitignored token file. If a script needs a token and none is cached, it should fail loudly with a message telling the operator to run `scenario auth`.
 
 ## Script surface
 
@@ -164,7 +164,7 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 ### `install:mcp:prod` — prints the connection guide
 
-Prod uses OAuth (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)), but Claude Desktop's `claude_desktop_config.json` is stdio-only — the same platform constraint that forces the `install:mcp:local` entry above through the `mcp-remote` bridge (the "Why `mcp-remote` and not `type: "http"`?" callout under install:mcp:local has the rationale). What's different for prod is that `mcp-remote` speaks the full MCP OAuth flow natively: it fetches our `/.well-known/oauth-authorization-server` on first run, performs Dynamic Client Registration, pops the system browser for the Stytch consent page, caches the access token under `~/.mcp-auth/`, and refreshes on expiry. So the prod entry needs no `--header`, no `AUTH_HEADER`, no bearer — `mcp-remote` handles authentication end-to-end.
+Prod uses OAuth (see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), but Claude Desktop's `claude_desktop_config.json` is stdio-only — the same platform constraint that forces the `install:mcp:local` entry above through the `mcp-remote` bridge (the "Why `mcp-remote` and not `type: "http"`?" callout under install:mcp:local has the rationale). What's different for prod is that `mcp-remote` speaks the full MCP OAuth flow natively: it fetches our `/.well-known/oauth-authorization-server` on first run, performs Dynamic Client Registration, pops the system browser for Clerk's hosted consent page, caches the access token under `~/.mcp-auth/`, and refreshes on expiry. So the prod entry needs no `--header`, no `AUTH_HEADER`, no bearer — `mcp-remote` handles authentication end-to-end.
 
 ```
 bun run install:mcp:prod
@@ -184,22 +184,22 @@ The output prints this JSON block for `~/Library/Application Support/Claude/clau
 }
 ```
 
-Paste it in and restart Claude Desktop. On first connection `mcp-remote` pops a browser window to the Stytch consent page; enter your email, receive a 6-digit one-time passcode in your inbox, type it back into the consent page (no password to remember, no social login), approve. From then on Desktop talks to `mcp-remote`'s stdio proxy, which talks to `https://gc.leiserson.me/mcp` over HTTPS with a Stytch-issued access token; the token is refreshed automatically on expiration.
+Paste it in and restart Claude Desktop. On first connection `mcp-remote` pops a browser window to Clerk's hosted consent page; sign in (or sign up) with whatever method you've enabled on the Clerk instance, approve the scopes. From then on Desktop talks to `mcp-remote`'s stdio proxy, which talks to `https://gc.leiserson.me/mcp` over HTTPS with a Clerk-issued access token; the token is refreshed automatically on expiration.
 
 The absolute-path `command` + pinned `PATH` env is the same Node-version caveat `install:mcp:local` carries — `mcp-remote` runs under Desktop's launch-services `PATH`, which may not include your shell's `nvm`/Homebrew bin directory.
 
 Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
 
-**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON, (b) your Stytch project has Connected Apps enabled, the redirect URL is registered, and email OTP is enabled as a login method, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
+**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON (proxied from Clerk's FAPI), (b) your Clerk instance has Dynamic Client Registration toggled on in the OAuth applications dashboard, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
 
 ## Claude.ai Connectors (mobile / web)
 
 Claude iOS, Android, and web support remote MCP connectors. In-app: **Settings → Connectors → Add custom connector**.
 
 - **URL:** `https://gc.leiserson.me/mcp`
-- **Auth:** leave blank. claude.ai's Custom Connectors only speak OAuth 2.1 + DCR — there's no field for a static bearer token, and that's the reason we adopted Stytch (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)).
+- **Auth:** leave blank. claude.ai's Custom Connectors only speak OAuth 2.1 + DCR — there's no field for a static bearer token, and that's the reason we adopted Clerk (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)).
 
-On first connection, claude.ai fetches `/.well-known/oauth-authorization-server`, registers itself via DCR, redirects you to the Stytch-backed consent page, and once you've signed in via email OTP (6-digit passcode to your inbox), caches the access token. Subsequent sessions refresh silently.
+On first connection, claude.ai fetches `/.well-known/oauth-authorization-server`, registers itself via DCR, redirects you to Clerk's hosted consent page, and once you've signed in + approved scopes, caches the access token. Subsequent sessions refresh silently.
 
 Local dev is not useful from mobile (localhost doesn't resolve on mobile networks). Prod-only on mobile is the right setup.
 
@@ -228,10 +228,9 @@ Run these in order. Each is independently safe to retry.
 
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
-3. Verify Stytch OAuth secrets + login-method config are in place (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)):
-   - `STYTCH_PROJECT_ID` + `STYTCH_SECRET` uploaded via `wrangler secret put …`;
-   - Stytch dashboard has Connected Apps enabled with `https://gc.leiserson.me/authorize/callback` registered as an allowed redirect URL;
-   - Login methods on the Stytch project are restricted to **email OTP only** — magic links, passwords, social logins (Google / GitHub), WebAuthn, and enterprise SSO are all disabled;
+3. Verify Clerk OAuth secrets + instance config are in place (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)):
+   - `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` uploaded via `wrangler secret put …`;
+   - Clerk dashboard → OAuth applications → **Dynamic Client Registration toggled on** (so claude.ai can self-register);
    - No `MCP_BEARER_TOKEN` in prod Cloudflare secrets.
 4. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
 5. Verify the seed:
@@ -243,18 +242,18 @@ Run these in order. Each is independently safe to retry.
    ```bash
    curl -s https://gc.leiserson.me/.well-known/oauth-authorization-server | jq .
    ```
-   Expect JSON with `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`. HTTP 404 → handler not wired; HTTP 500 → `STYTCH_*` env not set on the Worker.
+   Expect JSON with `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `jwks_uri` (all pointing at Clerk's FAPI). HTTP 404 → handler not wired; HTTP 500 → `CLERK_*` env not set on the Worker.
 7. Smoke-test end-to-end:
    ```bash
    bun run scenario kitchen --target prod
    ```
    The prod-confirm prompt prints a plan; type `y`. Expect `✓ scenario completed`.
 
-   This is the load-bearing smoke-test — it exercises the full Day-0 walkthrough (`create_party` → `create_project` → `create_job` → `create_scope` → `apply_patch` → `issue_ntp` → `get_scope_tree`) against live D1 over the real MCP HTTP transport. The scenario runner acquires a Stytch-minted token via the `scenario auth` helper (per [now.md](../product/now.md) #1) and caches it locally.
+   This is the load-bearing smoke-test — it exercises the full Day-0 walkthrough (`create_party` → `create_project` → `create_job` → `create_scope` → `apply_patch` → `issue_ntp` → `get_scope_tree`) against live D1 over the real MCP HTTP transport. The scenario runner acquires a Clerk-minted token via the `scenario auth` helper (deferred to a future coding slice) and caches it locally.
 
    On failure: tail the Worker with `bunx wrangler tail gc-erp-mcp-server --remote` from `packages/mcp-server/` and re-run. HTTP 401 from the runner → token expired or invalid; rerun `bun run scenario auth --target prod`.
 
-> **Why not a one-shot `curl`?** The streaming HTTP transport is stateful — `tools/list` requires an `Mcp-Session-Id` header obtained from a prior `initialize` handshake. A single `curl tools/list` returns HTTP 400 with `Mcp-Session-Id header is required`, which looks like a bug but isn't. If you need a curl-level check, do it as two requests: POST `initialize` (capture `Mcp-Session-Id` from the response headers), then POST `tools/list` carrying that header and a valid Stytch bearer. The scenario runner does both for you.
+> **Why not a one-shot `curl`?** The streaming HTTP transport is stateful — `tools/list` requires an `Mcp-Session-Id` header obtained from a prior `initialize` handshake. A single `curl tools/list` returns HTTP 400 with `Mcp-Session-Id header is required`, which looks like a bug but isn't. If you need a curl-level check, do it as two requests: POST `initialize` (capture `Mcp-Session-Id` from the response headers), then POST `tools/list` carrying that header and a valid Clerk-issued bearer. The scenario runner does both for you.
 
 ## Rollback
 

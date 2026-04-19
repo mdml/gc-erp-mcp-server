@@ -23,8 +23,8 @@ interface Env {
   MCP_BEARER_TOKEN?: string;
   MCP_OBJECT: DurableObjectNamespace;
   DB: D1Database;
-  STYTCH_PROJECT_ID?: string;
-  STYTCH_SECRET?: string;
+  CLERK_SECRET_KEY?: string;
+  CLERK_PUBLISHABLE_KEY?: string;
 }
 
 export class GcErpMcp extends McpAgent<Env> {

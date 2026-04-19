@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stytchPublicBase, timingSafeEqual } from "./auth";
+import { deriveFapiUrl, timingSafeEqual } from "./auth";
 
 describe("timingSafeEqual", () => {
   it("returns true for identical strings", () => {
@@ -21,22 +21,25 @@ describe("timingSafeEqual", () => {
   });
 });
 
-describe("stytchPublicBase", () => {
-  it("routes project-test-* to test.stytch.com", () => {
-    expect(stytchPublicBase("project-test-abc")).toBe(
-      "https://test.stytch.com/v1/public/project-test-abc",
+describe("deriveFapiUrl", () => {
+  it("decodes a pk_live publishable key to Clerk's FAPI URL", () => {
+    // base64("clerk.gc.leiserson.me$") → Y2xlcmsuZ2MubGVpc2Vyc29uLm1lJA
+    expect(deriveFapiUrl("pk_live_Y2xlcmsuZ2MubGVpc2Vyc29uLm1lJA")).toBe(
+      "https://clerk.gc.leiserson.me",
     );
   });
 
-  it("routes project-live-* to api.stytch.com", () => {
-    expect(stytchPublicBase("project-live-xyz")).toBe(
-      "https://api.stytch.com/v1/public/project-live-xyz",
-    );
+  it("decodes a pk_test publishable key (dev instance)", () => {
+    // base64("example-123-45.clerk.accounts.dev$")
+    expect(
+      deriveFapiUrl("pk_test_ZXhhbXBsZS0xMjMtNDUuY2xlcmsuYWNjb3VudHMuZGV2JA"),
+    ).toBe("https://example-123-45.clerk.accounts.dev");
   });
 
-  it("defaults to test.stytch.com for unknown prefixes (safer than guessing prod)", () => {
-    expect(stytchPublicBase("project-sandbox-foo")).toBe(
-      "https://test.stytch.com/v1/public/project-sandbox-foo",
+  it("tolerates keys without the trailing $ sentinel", () => {
+    // base64("clerk.example.com")
+    expect(deriveFapiUrl("pk_live_Y2xlcmsuZXhhbXBsZS5jb20=")).toBe(
+      "https://clerk.example.com",
     );
   });
 });

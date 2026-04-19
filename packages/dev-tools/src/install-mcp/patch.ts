@@ -88,12 +88,12 @@ export function serializeConfig(config: DesktopConfig): string {
 }
 
 /**
- * Prints connection instructions for the deployed Worker. Prod uses Stytch
- * Connected Apps for OAuth 2.1 + DCR (see ADR 0010), so Claude Desktop,
- * iOS, Android, and claude.ai web all connect through the same flow —
- * `mcp-remote` bridges Desktop's stdio transport to the Worker's streamable
- * HTTP endpoint and handles the OAuth dance natively (DCR → browser consent
- * with email OTP → cached token at `~/.mcp-auth/`, refreshed on expiry).
+ * Prints connection instructions for the deployed Worker. Prod uses Clerk
+ * for OAuth 2.1 + DCR (see ADR 0012), so Claude Desktop, iOS, Android, and
+ * claude.ai web all connect through the same flow — `mcp-remote` bridges
+ * Desktop's stdio transport to the Worker's streamable HTTP endpoint and
+ * handles the OAuth dance natively (DCR → browser consent hosted by Clerk
+ * → cached token at `~/.mcp-auth/`, refreshed on expiry).
  *
  * No bearer is interpolated. The absolute `command` path + pinned `PATH`
  * works around Desktop's launch-services PATH not including Homebrew/nvm.
@@ -124,8 +124,9 @@ export function renderProdConnectionGuide(): string {
     "  ~/Library/Application Support/Claude/claude_desktop_config.json",
     `(alongside any existing ${LOCAL_ENTRY_NAME} entry) and restart Claude`,
     "Desktop. On first connection `mcp-remote` pops a browser window to the",
-    "Stytch consent page; enter your email, receive a 6-digit passcode, type",
-    "it back into the consent page. No password, no token to paste.",
+    "Clerk-hosted consent page; sign in (or sign up) with the method you",
+    "configured in Clerk's dashboard, then approve the scopes. No password",
+    "or token to paste into Desktop.",
     "",
     desktopBlock,
     "",
@@ -140,8 +141,8 @@ export function renderProdConnectionGuide(): string {
     "  Auth: leave blank (OAuth handled in-app).",
     "",
     "On first connection claude.ai fetches the discovery document, registers",
-    "itself via DCR, redirects to the Stytch consent page (email OTP), and",
-    "caches the access token. Subsequent sessions refresh silently.",
+    "itself via DCR, redirects to Clerk's hosted consent page, and caches",
+    "the access token. Subsequent sessions refresh silently.",
     "",
   ].join("\n");
 }

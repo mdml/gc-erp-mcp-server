@@ -13,9 +13,10 @@ saveTextLockfile = true
 minimumReleaseAge = 604800
 minimumReleaseAgeExcludes = [
   "@cloudflare/workers-types",
+  # Clerk ships frequently — like wrangler, Clerk's releases age out of the
+  # 7-day window before they stabilize. Per ADR 0012.
+  "@clerk/backend",
+  "@clerk/shared",
   "agents",
-  # Stytch ships frequently; we track latest v14 deliberately. Trim once
-  # 14.x stabilizes and the next minor ages out.
-  "stytch",
   "wrangler",
 ]

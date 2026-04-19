@@ -33,8 +33,8 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 
 ## Runtime / MCP
 
-- [x] ~~OAuth on the Worker — unblock claude.ai web + mobile.~~ *Resolved: [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) — adopt Stytch Connected Apps as the OAuth 2.1 AS (Cloudflare-partner path, no KV/DO state, ~20-line Worker delta). Local dev keeps the static bearer gate.*
-- [x] ~~Where does the server run long-term? Local process (`npx`), hosted, or both? Affects auth and multi-device story.~~ *Resolved: hosted on Cloudflare at `gc.leiserson.me` ([ADR 0002](../decisions/0002-infra-cli.md)); prod auth is Stytch OAuth ([ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)), local stays on a static bearer for scenario-runner simplicity.*
+- [x] ~~OAuth on the Worker — unblock claude.ai web + mobile.~~ *Resolved: [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) — adopt Clerk as the OAuth 2.1 AS (hosted consent for DCR clients, `@clerk/backend` on Workers, proxied discovery doc). Supersedes ADR 0010 (Stytch). Local dev keeps the static bearer gate.*
+- [x] ~~Where does the server run long-term? Local process (`npx`), hosted, or both? Affects auth and multi-device story.~~ *Resolved: hosted on Cloudflare at `gc.leiserson.me` ([ADR 0002](../decisions/0002-infra-cli.md)); prod auth is Clerk OAuth ([ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), local stays on a static bearer for scenario-runner simplicity.*
 - [ ] **Which MCP app ships first.** Leaning: cost-entry form at M3, job dashboard at M4, pay app generator at M5. See [milestones.md](milestones.md).
 - [ ] **How Claude picks an app.** Return type? Explicit hints? Re-read the MCP Apps extension spec before M3.
 

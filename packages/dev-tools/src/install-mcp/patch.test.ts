@@ -138,11 +138,10 @@ describe("renderProdConnectionGuide", () => {
     expect(out).not.toContain('"type": "http"');
   });
 
-  it("documents the Stytch email-OTP consent flow for Desktop", () => {
+  it("documents the Clerk hosted-consent flow for Desktop", () => {
     const out = renderProdConnectionGuide();
-    expect(out).toContain("Stytch consent page");
-    expect(out).toMatch(/email/i);
-    expect(out).toMatch(/6-digit|passcode|OTP/i);
+    expect(out).toContain("Clerk-hosted consent page");
+    expect(out).toMatch(/approve the scopes/i);
   });
 
   it("includes a claude.ai Connectors section (now supported via OAuth)", () => {
