@@ -162,7 +162,7 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 ### `install:mcp:prod` — prints the connection guide
 
-Prod uses OAuth (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)), so the Desktop config is URL-only — no `headers`, no bearer to copy. Claude Desktop discovers the OAuth flow via `/.well-known/oauth-authorization-server` on first connection and walks the user through consent.
+Prod uses OAuth (see [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)), but Claude Desktop's `claude_desktop_config.json` is stdio-only — the same platform constraint that forces the `install:mcp:local` entry above through the `mcp-remote` bridge (the "Why `mcp-remote` and not `type: "http"`?" callout under install:mcp:local has the rationale). What's different for prod is that `mcp-remote` speaks the full MCP OAuth flow natively: it fetches our `/.well-known/oauth-authorization-server` on first run, performs Dynamic Client Registration, pops the system browser for the Stytch consent page, caches the access token under `~/.mcp-auth/`, and refreshes on expiry. So the prod entry needs no `--header`, no `AUTH_HEADER`, no bearer — `mcp-remote` handles authentication end-to-end.
 
 ```
 bun run install:mcp:prod
@@ -174,18 +174,21 @@ The output prints this JSON block for `~/Library/Application Support/Claude/clau
 {
   "mcpServers": {
     "gc-erp-prod": {
-      "type": "http",
-      "url": "https://gc.leiserson.me/mcp"
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "mcp-remote", "https://gc.leiserson.me/mcp"],
+      "env": { "PATH": "/opt/homebrew/bin:/usr/bin:/bin" }
     }
   }
 }
 ```
 
-Paste it in and restart Claude Desktop. On first connection Desktop pops a browser window to `https://gc.leiserson.me/authorize`, which renders a Stytch-backed consent page; enter your email, receive a 6-digit one-time passcode in your inbox, type it back into the consent page (no password to remember, no social login), approve, and Desktop receives the access token. The token is refreshed automatically on expiration.
+Paste it in and restart Claude Desktop. On first connection `mcp-remote` pops a browser window to the Stytch consent page; enter your email, receive a 6-digit one-time passcode in your inbox, type it back into the consent page (no password to remember, no social login), approve. From then on Desktop talks to `mcp-remote`'s stdio proxy, which talks to `https://gc.leiserson.me/mcp` over HTTPS with a Stytch-issued access token; the token is refreshed automatically on expiration.
+
+The absolute-path `command` + pinned `PATH` env is the same Node-version caveat `install:mcp:local` carries — `mcp-remote` runs under Desktop's launch-services `PATH`, which may not include your shell's `nvm`/Homebrew bin directory.
 
 Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
 
-**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON, (b) your Stytch project has Connected Apps enabled and your redirect URL is registered, (c) no leftover `MCP_BEARER_TOKEN` is configured as a prod Cloudflare secret (prod should only have `STYTCH_PROJECT_ID` + `STYTCH_SECRET`).
+**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON, (b) your Stytch project has Connected Apps enabled, the redirect URL is registered, and email OTP is enabled as a login method, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
 
 > ⚠️ **Transitional state.** The above describes the target post-Stytch flow. Until the Stytch coding slice lands (tracked as [now.md](../product/now.md) #1), the `install:mcp:prod` script still emits a bearer-based block and prod is reachable only from Mac Claude Desktop via static bearer — claude.ai web + mobile connectors can't connect. After the slice lands, this doc matches the code.
 
