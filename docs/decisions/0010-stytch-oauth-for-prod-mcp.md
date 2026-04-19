@@ -21,9 +21,11 @@ Secondary context — from [scope.md](../product/scope.md) and Max's stated inte
 
 ## Decision
 
-**Adopt Stytch Connected Apps as the OAuth 2.1 authorization server for production `/mcp*`. Local dev (`wrangler dev`, scenario runner) keeps the existing bearer-token gate.** Stytch hosts `/token` and `/register` (DCR); the Worker exposes `/.well-known/oauth-authorization-server` pointing at them plus a local `/authorize` route that renders a Stytch-backed consent page. Incoming `/mcp*` bearers are Stytch-issued JWTs validated via the Stytch SDK; `getMcpAuthContext()` exposes the authenticated user's `claims.sub` to tool handlers.
+**Adopt Stytch Connected Apps as the OAuth 2.1 authorization server for production `/mcp*`, with email OTP as the sole login method behind the consent page. Local dev (`wrangler dev`, scenario runner) keeps the existing bearer-token gate.** Stytch hosts `/token` and `/register` (DCR); the Worker exposes `/.well-known/oauth-authorization-server` pointing at them plus a local `/authorize` route that renders a Stytch-backed consent page. Incoming `/mcp*` bearers are Stytch-issued JWTs validated via the Stytch SDK; `getMcpAuthContext()` exposes the authenticated user's `claims.sub` to tool handlers.
 
 The production bearer path is retired. The local bearer path stays, gated on `env.STYTCH_PROJECT_ID` absence — prod sets the secret, local doesn't.
+
+**Login-method scope:** the consent page offers **email OTP only** — a one-time 6-digit passcode sent to the user's email, typed back into the consent page. No magic links (click-a-URL-in-email), no passwords, no social logins, no enterprise SSO. This is a Stytch dashboard setting, not Worker code — we configure the project's login methods at provisioning time. Fits the two-operator dogfood shape (Max + Salman both have known emails; no password to remember, no SSO to manage) and keeps the authentication surface minimal. If/when a third operator or a real customer lands, expanding to magic links or an upstream IdP is a Stytch-dashboard toggle — no code change.
 
 ## Options considered
 
@@ -69,6 +71,7 @@ Out of scope for this ADR (it's the decision, not the wiring), but to keep the c
 - Stytch replaces `@cloudflare/workers-oauth-provider` entirely in this setup; do **not** combine them.
 - Local-mode bearer check stays in `handler.ts`; prod-mode JWT validation is a new branch gated on `env.STYTCH_PROJECT_ID`.
 - No KV binding, no DO migration for OAuth. If a `stytch` helper wants KV for caching JWKS, add it then — not preemptively.
+- **Verify email-OTP-only is a per-project Stytch dashboard setting.** At provisioning time, disable every other login method on the Stytch project (magic links, passwords, OAuth social logins, SSO, WebAuthn). The Stytch docs describe email OTP as a first-class product with dedicated API endpoints + configurable 1–10 minute expiration ([Stytch Email OTP docs](https://stytch.com/docs/guides/passwordless/email-otps)), but "Connected Apps consent page restricted to exactly one login method" is not something I verified end-to-end by clicking through the dashboard — the coding slice should confirm before declaring the path green. If the dashboard doesn't offer clean per-method toggles, fall back to a project-level allowlist of enabled methods or surface it as a risk.
 
 ## Advice
 

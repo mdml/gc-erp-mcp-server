@@ -106,7 +106,7 @@ Piping direct from `op read` keeps the values out of shell history and off disk.
 
 ## Connect from a client
 
-Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`. In **Claude Desktop** and **claude.ai** (web + iOS + Android), you connect by URL only — no header to paste. On first connection each client walks through the OAuth consent flow (magic-link sign-in via email, backed by Stytch). See [`docs/guides/dogfood.md`](docs/guides/dogfood.md) for the full per-client setup, and [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md) for why static bearer headers don't work with claude.ai.
+Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`. In **Claude Desktop** and **claude.ai** (web + iOS + Android), you connect by URL only — no header to paste. On first connection each client walks through the OAuth consent flow: enter your email, receive a 6-digit one-time passcode, type it back in to approve (email OTP via Stytch — no password, no social login). See [`docs/guides/dogfood.md`](docs/guides/dogfood.md) for the full per-client setup, and [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md) for why static bearer headers don't work with claude.ai and why email OTP is the only enabled login method.
 
 ## Scripts (root)
 
