@@ -33,6 +33,7 @@ import {
 import {
   type DeveloperSecret,
   developerSecrets,
+  localDevVars,
   type SecretTarget,
   type TeamSecret,
   teamSecrets,
@@ -212,13 +213,37 @@ async function syncDeveloper(
   return { developer, skipped };
 }
 
+/**
+ * Build the `.dev.vars` body from resolved secrets + literal local values.
+ * Literals override resolved values of the same name — local stays local.
+ * Pure helper extracted from `writeArtifacts` so it's directly testable.
+ */
+export function buildDevVarsBody(
+  resolved: ReadonlyArray<{
+    name: string;
+    value: string;
+    targets: SecretTarget[];
+  }>,
+  literals: Record<string, string>,
+): { body: string; names: string[] } {
+  const merged = new Map<string, string>();
+  for (const s of resolved) {
+    if (s.targets.includes("dev-vars")) merged.set(s.name, s.value);
+  }
+  for (const [name, value] of Object.entries(literals)) {
+    merged.set(name, value);
+  }
+  const names = Array.from(merged.keys());
+  const body = `${names.map((n) => `${n}=${merged.get(n)}`).join("\n")}\n`;
+  return { body, names };
+}
+
 async function writeArtifacts(
   root: string,
   pubkey: string,
   resolved: ResolvedSecret[],
 ): Promise<{ envrcNames: string[]; devVarsNames: string[] }> {
   const envrc = resolved.filter((s) => s.targets.includes("envrc"));
-  const devVars = resolved.filter((s) => s.targets.includes("dev-vars"));
 
   const envrcBody = `${envrc
     .map((s) => `${s.name}=${shellQuote(s.value)}`)
@@ -226,12 +251,15 @@ async function writeArtifacts(
   const encrypted = await ageEncrypt(envrcBody, pubkey);
   writeAtomic(join(root, ".envrc.enc"), encrypted);
 
-  const devVarsBody = `${devVars.map((s) => `${s.name}=${s.value}`).join("\n")}\n`;
+  const { body: devVarsBody, names: devVarsNames } = buildDevVarsBody(
+    resolved,
+    localDevVars,
+  );
   writeAtomic(join(root, MCP_SERVER_REL, ".dev.vars"), devVarsBody);
 
   return {
     envrcNames: envrc.map((s) => s.name),
-    devVarsNames: devVars.map((s) => s.name),
+    devVarsNames,
   };
 }
 
