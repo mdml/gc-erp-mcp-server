@@ -6,8 +6,8 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Up next
 
-1. **Stytch OAuth Path B — real consent flow.** PR #28 landed a Path A implementation (`/authorize` 302s to a generic Stytch URL) that fails at the consent step — Stytch Consumer Connected Apps requires customer-hosted consent, not a blind redirect. Prod Worker rolled back to the pre-Stytch bearer binary; bearer-Desktop dogfood still works. Next slice: spawn a worktree from `feat/dogfood-prep`, implement `/authorize` as a real OIDC entry point using `stytch.idp.oauth.*` SDK methods — parse OAuth params, check session cookie, render email-OTP login if absent, render consent screen, mint auth code via SDK, redirect back to client. Also add `jwks_uri` to `/.well-known`. Verification: claude.ai web Custom Connector connects end-to-end + Desktop via mcp-remote also connects. See [retro](../retros/2026-04-19-stytch-path-a-false-start.md) for diagnosis + the slice prompt.
-2. **Merge `feat/dogfood-prep → main`** after Path B lands and claude.ai connects end-to-end. M3 sequencing decided at the next session start.
+1. **Clerk OAuth slice — replace Stytch stand-in.** Spike (see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)) found Clerk hosts the consent page end-to-end for DCR clients (mandatory-on), eliminating the ~200–400 LOC of customer-hosted consent code Stytch Path B would have required. Spawn a worktree from `feat/dogfood-prep`; execute per [PROMPTS.md](../../PROMPTS.md). **Hard-gated by three pre-flight checks** — Clerk provisioning, `@clerk/backend` loading on Workers, and claude.ai DCR → Clerk hosted consent → token exchange round-trip. If any pre-flight fails, **fall back to Stytch Path B** (reconstruct prompt per [ADR 0012 §Rollback plan](../decisions/0012-clerk-for-prod-mcp-oauth.md) — the wiring skeleton from PR #28 is reusable either way). See [retro](../retros/2026-04-19-stytch-path-a-false-start.md) for why Path A failed and how we arrived at Clerk.
+2. **Merge `feat/dogfood-prep → main`** after the Clerk slice lands and claude.ai connects end-to-end. M3 sequencing decided at the next session start.
 
 ## In flight
 
@@ -15,7 +15,7 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Waiting on
 
-*(nothing yet)*
+- **Clerk instance provisioning** (Max). Live application with Dynamic Client Registration toggled on. Secrets at `op://gc-erp/clerk/{publishable-key,secret-key}`. Required for [PROMPTS.md](../../PROMPTS.md) pre-flight 1.
 
 ## Recently done
 

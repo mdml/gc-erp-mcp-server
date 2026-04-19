@@ -2,7 +2,8 @@
 type: ADR
 id: "0010"
 title: "Stytch Connected Apps for MCP OAuth in prod"
-status: active
+status: superseded
+superseded_by: "0012"
 date: 2026-04-18
 ---
 
