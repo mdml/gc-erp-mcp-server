@@ -61,16 +61,16 @@ export const teamSecrets: TeamSecret[] = [
     targets: ["envrc"],
   },
   {
-    // Stytch OAuth project credentials (ADR 0010). envrc-only — local mode
-    // is deliberately gated on the ABSENCE of STYTCH_PROJECT_ID, so these
+    // Clerk OAuth credentials (ADR 0012). envrc-only — local mode
+    // is deliberately gated on the ABSENCE of CLERK_SECRET_KEY, so these
     // must never land in .dev.vars.
-    name: "STYTCH_PROJECT_ID",
-    opRef: "op://gc-erp/stytch/project-id",
+    name: "CLERK_PUBLISHABLE_KEY",
+    opRef: "op://gc-erp/clerk/publishable-key",
     targets: ["envrc"],
   },
   {
-    name: "STYTCH_SECRET",
-    opRef: "op://gc-erp/stytch/secret",
+    name: "CLERK_SECRET_KEY",
+    opRef: "op://gc-erp/clerk/secret-key",
     targets: ["envrc"],
   },
 ];

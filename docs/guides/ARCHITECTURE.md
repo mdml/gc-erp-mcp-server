@@ -17,15 +17,15 @@ For what the system *represents* — data model, job walkthrough, open questions
 │  Claude web,     │                                         │  ┌──────────────────────┐  │
 │  Claude mobile)  │  ◀─────────────────────────────────     │  │  fetch handler       │  │
 └──────────────────┘            JSON-RPC responses           │  │  - prod: validate    │  │
-         │                                                   │  │    Stytch JWT        │  │
+         │                                                   │  │    Clerk JWT         │  │
          │ OAuth 2.1 + DCR                                   │  │  - local: static     │  │
          │ (prod only)                                       │  │    bearer compare    │  │
          ▼                                                   │  │  - serve /.well-known│  │
-┌──────────────────┐                                         │  │  - /authorize (prod) │  │
-│  Stytch          │  ◀─ /register, /token ──                │  │  - route /mcp → DO   │  │
-│  Connected Apps  │                                         │  └──────────┬───────────┘  │
-│  (OAuth AS)      │                                         │             │              │
-└──────────────────┘                                         │             ▼              │
+┌──────────────────┐                                         │  │    (auth-server +    │  │
+│  Clerk           │  ◀─ /register, /authorize, /token ─     │  │     prot-resource)   │  │
+│  (OAuth AS +     │   + hosted consent page                 │  │  - route /mcp → DO   │  │
+│   hosted consent)│                                         │  └──────────┬───────────┘  │
+└──────────────────┘                                         │             │              │
                                                              │  ┌──────────────────────┐  │
                                                              │  │ GcErpMcp Durable     │  │
                                                              │  │ Object (per session) │  │
@@ -41,8 +41,8 @@ For what the system *represents* — data model, job walkthrough, open questions
 - **Product:** the MCP server itself. Distribution is a hosted URL plus an OAuth flow (prod) or a static bearer token (local).
 - **Transport:** streamable HTTP, per the MCP spec. Stdio is out of scope — the server has to be reachable from phones.
 - **Session model:** Cloudflare `agents/McpAgent` backs each MCP session with its own Durable Object instance. The DO holds MCP-session runtime state only (transport, subscriptions, auth props from the OAuth flow). Domain state — jobs, commitments, costs, documents — lives in D1 and R2. See [ADR 0003](../decisions/0003-storage-split.md).
-- **Auth (prod):** Stytch Connected Apps is the OAuth 2.1 AS. The Worker exposes `/.well-known/oauth-authorization-server` (Stytch endpoints) and a local `/authorize` consent page; `/mcp*` validates the Stytch-issued JWT on every request and exposes `claims.sub` to tool handlers via `getMcpAuthContext()`. See [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md).
-- **Auth (local):** static bearer (`MCP_BEARER_TOKEN=dev` in `.dev.vars`). Gated on `env.STYTCH_PROJECT_ID` absence — prod sets it, local doesn't. Keeps the scenario runner simple; local D1 holds no real data.
+- **Auth (prod):** Clerk is the OAuth 2.1 AS and hosts the consent page end-to-end. The Worker exposes `/.well-known/oauth-authorization-server` (proxied from Clerk's FAPI discovery doc) and `/.well-known/oauth-protected-resource` (Clerk-shaped metadata referenced from the `/mcp` 401's `www-authenticate`). `/mcp*` validates the Clerk-issued JWT via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })` and exposes `userId` / `scopes` / `clientId` to tool handlers via `getMcpAuthContext().auth`. No local `/authorize` route — clients go directly to Clerk's FAPI per the discovery doc. See [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md).
+- **Auth (local):** static bearer (`MCP_BEARER_TOKEN=dev` in `.dev.vars`). Gated on `env.CLERK_SECRET_KEY` absence — prod sets it, local doesn't. Keeps the scenario runner simple; local D1 holds no real data.
 
 ---
 
@@ -111,13 +111,13 @@ A single HTTP request from a client:
 1. **Edge entry.** Cloudflare routes the request to our Worker at `https://gc.leiserson.me` (attached via the `custom_domain: true` route in `wrangler.jsonc`; the `*.workers.dev` fallback is disabled).
 2. **Fetch handler** (`packages/mcp-server/src/index.ts` → `packages/mcp-server/src/handler.ts`):
    - `GET /` → plaintext banner, 200. Used as a trivial liveness check; no auth.
-   - `GET /.well-known/oauth-authorization-server` → OAuth server metadata pointing MCP clients at Stytch's `/register` and `/token` plus our local `/authorize`. Prod only (local returns 404; local uses the bearer path).
-   - `GET|POST /authorize` → Stytch-backed consent page. Prod only.
-   - `GET|POST /mcp*`:
-     - **Prod** (`env.STYTCH_PROJECT_ID` set) — validate the incoming Stytch-issued JWT via the `stytch` SDK; on success, attach `claims` to the execution context's `props`; on failure return `401` with `WWW-Authenticate: Bearer resource_metadata_uri=".../.well-known/oauth-protected-resource"`.
-     - **Local** (no `STYTCH_PROJECT_ID`) — constant-time compare `Authorization: Bearer $MCP_BEARER_TOKEN` via `timingSafeEqual`; `401` on mismatch.
-   - Other paths → `404 not found`.
-3. **MCP delegation.** Authenticated `/mcp*` requests are handed to `GcErpMcp.serve("/mcp")`, Cloudflare's `agents/McpAgent` runtime. Tool handlers read the authenticated user's claims via `getMcpAuthContext()` from `agents/mcp`.
+   - `GET /.well-known/oauth-authorization-server` → proxied verbatim from Clerk's FAPI discovery doc (`{fapi}/.well-known/oauth-authorization-server`). Prod only (local returns 404; local uses the bearer path).
+   - `GET /.well-known/oauth-protected-resource` → Clerk-shaped protected-resource metadata; referenced from the `/mcp` 401's `www-authenticate` header. Prod only.
+   - `POST /mcp*`:
+     - **Prod** (`env.CLERK_SECRET_KEY` set) — validate the incoming Clerk-issued OAuth JWT via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; on success, attach `{ auth: { userId, scopes, clientId } }` to the execution context's `props`; on failure return `401` with `WWW-Authenticate: Bearer resource_metadata_uri=".well-known/oauth-protected-resource"`.
+     - **Local** (no `CLERK_SECRET_KEY`) — constant-time compare `Authorization: Bearer $MCP_BEARER_TOKEN` via `timingSafeEqual`; `401` on mismatch.
+   - Other paths → `404 not found`. Note: no `/authorize` route — the discovery doc points claude.ai directly at Clerk's FAPI for authorization, per ADR 0012's hosted-consent model.
+3. **MCP delegation.** Authenticated `/mcp*` requests are handed to `GcErpMcp.serve("/mcp")`, Cloudflare's `agents/McpAgent` runtime. Tool handlers read the authenticated user's identity via `getMcpAuthContext().auth` from `agents/mcp` (shape: `{ userId, scopes, clientId }`).
 4. **Durable Object per session.** `McpAgent` resolves (or spawns) a Durable Object instance keyed by the MCP session ID. One session, one DO. This is where MCP server state (tool list, subscriptions, in-flight requests) lives for the life of the connection.
 5. **MCP server dispatch.** Inside the DO, a `McpServer` (from `@modelcontextprotocol/sdk`) receives the JSON-RPC message and dispatches to tool handlers registered in `GcErpMcp.init()`. At v1: `ping` and `list_jobs`.
 6. **Response.** Streamable HTTP carries the JSON-RPC response (and any SSE frames for streaming tools) back to the client.
@@ -149,10 +149,10 @@ Three layers, each with a different lifecycle and a different failure mode.
          ▼                                   into the local Worker
   shell env exports:                              (local dev only)
   - CLOUDFLARE_API_TOKEN                          MCP_BEARER_TOKEN=dev
-  - CLOUDFLARE_ACCOUNT_ID                         (no STYTCH_* — prod only)
+  - CLOUDFLARE_ACCOUNT_ID                         (no CLERK_* — prod only)
   - MCP_BEARER_TOKEN
-  - STYTCH_PROJECT_ID (prod use)
-  - STYTCH_SECRET     (prod use)
+  - CLERK_SECRET_KEY       (prod use)
+  - CLERK_PUBLISHABLE_KEY  (prod use)
          │
          ▼
     wrangler deploy
@@ -163,13 +163,13 @@ Three layers, each with a different lifecycle and a different failure mode.
                      [Cloudflare secrets — separate, one-time upload]
                                           │
                                           ▼
-                          wrangler secret put STYTCH_PROJECT_ID
-                          wrangler secret put STYTCH_SECRET
+                          wrangler secret put CLERK_SECRET_KEY
+                          wrangler secret put CLERK_PUBLISHABLE_KEY
                              (encrypted at rest on Cloudflare;
                               available to deployed Worker as env.*)
 
                           MCP_BEARER_TOKEN is NOT uploaded to prod —
-                          prod uses Stytch JWT validation instead (ADR 0010).
+                          prod uses Clerk JWT validation instead (ADR 0012).
 ```
 
 **Why this shape.**
@@ -179,8 +179,8 @@ Three layers, each with a different lifecycle and a different failure mode.
 - **direnv auto-loads on `cd`.** No `source .env` ritual; every shell at the repo root has the right env.
 - **`wrangler login` is deliberately avoided.** It writes a user-wide OAuth token at `~/.wrangler/config/default.toml` that would then be picked up by every Cloudflare-touching repo on the machine. Max works in multiple GitHub orgs — per-project env-var auth keeps projects isolated.
 - **`.dev.vars` is separate from the shell env.** Wrangler reads `.dev.vars` into the *Worker's* runtime environment during `wrangler dev`; those bindings don't touch the shell. `sync-secrets` writes both artifacts from the same 1Password lookup.
-- **Prod uses Stytch OAuth, not a bearer (per [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)).** `STYTCH_PROJECT_ID` + `STYTCH_SECRET` are uploaded via `wrangler secret put` — one-time per rotation, deliberately manual. The old `MCP_BEARER_TOKEN` prod upload is retired; claude.ai Custom Connectors reject bearer headers in favor of OAuth 2.1 + DCR, and Stytch Connected Apps is the OAuth AS. `MCP_BEARER_TOKEN=dev` stays in local `.dev.vars` for `wrangler dev` and the scenario runner (local D1 holds no real data).
-- **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `OP_SERVICE_ACCOUNT_TOKEN` / `STYTCH_PROJECT_ID` / `STYTCH_SECRET` variables above only reach their child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — the values don't get hashed into the task cache key. Without the declaration, wrangler sees no auth and silently falls back to OAuth — a class of bug the env-var auth pattern is meant to prevent, so the passthrough list is part of the secrets architecture, not a build-system detail.
+- **Prod uses Clerk OAuth, not a bearer (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)).** `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` are uploaded via `wrangler secret put` — one-time per rotation, deliberately manual. The old `MCP_BEARER_TOKEN` prod upload is retired; claude.ai Custom Connectors reject bearer headers in favor of OAuth 2.1 + DCR, and Clerk is the OAuth AS (with hosted consent — see ADR 0012 for why that matters vs. the superseded Stytch plan). `MCP_BEARER_TOKEN=dev` stays in local `.dev.vars` for `wrangler dev` and the scenario runner (local D1 holds no real data).
+- **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `OP_SERVICE_ACCOUNT_TOKEN` / `CLERK_SECRET_KEY` / `CLERK_PUBLISHABLE_KEY` variables above only reach their child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — the values don't get hashed into the task cache key. Without the declaration, wrangler sees no auth and silently falls back to OAuth — a class of bug the env-var auth pattern is meant to prevent, so the passthrough list is part of the secrets architecture, not a build-system detail.
 
 **`CLOUDFLARE_API_TOKEN` permission groups.** The token in 1Password needs the groups listed below. A missing group presents as a 401/403 from the specific endpoint that needs it — the symptom is service-specific (e.g. R2 works but D1 fails), *not* a blanket auth failure. Watch for that pattern when a new provider lands.
 
@@ -199,11 +199,11 @@ Files on disk, at rest:
 |-----------------------------------------|---------|------|--------------------------------------------|
 | `.envrc`                                | No      | Yes  | direnv shim — decryption logic only        |
 | `.envrc.enc`                            | Yes     | No   | age-encrypted dotenv (per-developer)       |
-| `packages/mcp-server/.dev.vars`         | Yes     | No   | wrangler dev local env (`MCP_BEARER_TOKEN=dev`; no `STYTCH_*` — OAuth is prod-only) |
+| `packages/mcp-server/.dev.vars`         | Yes     | No   | wrangler dev local env (`MCP_BEARER_TOKEN=dev`; no `CLERK_*` — OAuth is prod-only) |
 | `packages/mcp-server/.dev.vars.example` | No      | Yes  | template                                   |
 | `packages/dev-tools/src/secrets.config.ts` | No   | Yes  | declarative list of secrets + op refs      |
-| 1Password `gc-erp`                      | Yes     | —    | source of truth — holds `MCP_BEARER_TOKEN` (local-dev convenience) + `STYTCH_PROJECT_ID` + `STYTCH_SECRET` (prod-only) + Cloudflare creds |
-| Cloudflare secret storage               | Yes     | —    | production runtime env — `STYTCH_PROJECT_ID` + `STYTCH_SECRET`; no `MCP_BEARER_TOKEN` in prod |
+| 1Password `gc-erp`                      | Yes     | —    | source of truth — holds `MCP_BEARER_TOKEN` (local-dev convenience) + `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` (prod-only) + Cloudflare creds |
+| Cloudflare secret storage               | Yes     | —    | production runtime env — `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY`; no `MCP_BEARER_TOKEN` in prod |
 
 ---
 
@@ -308,7 +308,7 @@ Pointers into the roadmap — things the architecture has slots for but doesn't 
 - **MCP apps (UI components)** — [MCP Apps extension spec](https://modelcontextprotocol.io/extensions/apps/overview). First app targeted at M3 (cost-entry form).
 - **Pay-app PDF generation** — M5. Renders G702/G703 from a job's commitment + cost state. Likely a separate `packages/pay-app/` or an inline module on mcp-server.
 - **Integrations** — email ingestion for invoices, QuickBooks push, lien-waiver tracking. Milestone-dependent.
-- **Broader login methods beyond email OTP** — [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) adopts Stytch Connected Apps scoped to **email OTP only** (one-time 6-digit passcode). If/when we onboard users beyond Max + Salman, we can enable magic links, passwords, Google / GitHub OAuth, or enterprise SSO via Stytch's dashboard — no Worker-side code change, just a project-level toggle.
+- **Broader login methods + scope vocabulary** — [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) adopts Clerk with its default login surface. Clerk exposes a fixed scope vocabulary (`profile`, `email`, `public_metadata`, `private_metadata`, `openid`); per-tool scopes are out of scope for dogfood. Login methods (magic links, social, SSO) are dashboard toggles if we ever onboard beyond Max + Salman — no Worker-side change.
 - **Local dev server lifecycle** — `turbo run dev` runs foreground in a terminal; Claude Desktop's `gc-erp-local` entry only resolves while it's up. [ADR 0011](../decisions/0011-local-mcp-dev-server-foreground.md) rejects daemonization (opacity risk) and shipping a standalone binary (runtime fork). Re-evaluate if the manual-start step materially slows real dogfood sessions.
 - **CI** — no GitHub Actions yet. Pre-push + pre-commit cover local discipline; CI enters when remote collaboration does.
 - **ADR log** — [docs/decisions/](../decisions/) has the template + one seeded ADR. When a decision is non-obvious enough that we'd otherwise re-litigate it in a year, write an ADR.

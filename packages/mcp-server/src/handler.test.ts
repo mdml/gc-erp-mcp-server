@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StytchClaims, StytchValidator } from "./auth";
+import type { ClerkAuth, ClerkValidator } from "./auth";
 import { type McpFetcher, makeFetchHandler } from "./handler";
 
 interface TestEnv {
   MCP_BEARER_TOKEN?: string;
   MCP_OBJECT: DurableObjectNamespace;
   DB: D1Database;
-  STYTCH_PROJECT_ID?: string;
-  STYTCH_SECRET?: string;
+  CLERK_SECRET_KEY?: string;
+  CLERK_PUBLISHABLE_KEY?: string;
 }
 
 function makeLocalEnv(token: string | undefined = "super-secret"): TestEnv {
@@ -18,12 +18,21 @@ function makeLocalEnv(token: string | undefined = "super-secret"): TestEnv {
   };
 }
 
-function makeProdEnv(projectId = "project-test-abc"): TestEnv {
+// Publishable key encodes `clerk.gc.leiserson.me$` as base64 → pk_live_...
+// The discovery-doc proxy and protected-resource handler derive Clerk's FAPI
+// URL from this value, so fixture env matches what Clerk actually issues.
+const TEST_PUBLISHABLE_KEY = "pk_live_Y2xlcmsuZ2MubGVpc2Vyc29uLm1lJA";
+const TEST_FAPI_URL = "https://clerk.gc.leiserson.me";
+
+function makeProdEnv(
+  publishableKey: string = TEST_PUBLISHABLE_KEY,
+  secretKey = "sk_live_test-secret",
+): TestEnv {
   return {
     MCP_OBJECT: {} as unknown as DurableObjectNamespace,
     DB: {} as unknown as D1Database,
-    STYTCH_PROJECT_ID: projectId,
-    STYTCH_SECRET: "secret-test-xyz",
+    CLERK_SECRET_KEY: secretKey,
+    CLERK_PUBLISHABLE_KEY: publishableKey,
   };
 }
 
@@ -33,28 +42,26 @@ function stubMcp(body = "mcp-ok", status = 200): McpFetcher {
   };
 }
 
-function makeClaims(overrides: Partial<StytchClaims> = {}): StytchClaims {
+function makeAuth(overrides: Partial<ClerkAuth> = {}): ClerkAuth {
   return {
-    subject: "user-test-abc",
-    scope: "openid profile email",
-    audience: "connected-app-client-id",
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-    issued_at: Math.floor(Date.now() / 1000),
-    issuer: "https://test.stytch.com",
-    not_before: Math.floor(Date.now() / 1000),
-    token_type: "access_token",
-    custom_claims: {},
+    userId: "user_test_abc",
+    scopes: ["profile", "email"],
+    clientId: "client_test_xyz",
     ...overrides,
   };
 }
 
-function okValidator(claims: StytchClaims = makeClaims()) {
-  return vi.fn<StytchValidator>(async () => ({ claims }));
+function okValidator(auth: ClerkAuth = makeAuth()) {
+  return vi.fn<ClerkValidator>(async () => auth);
 }
 
 function rejectingValidator() {
-  return vi.fn<StytchValidator>(async () => {
-    throw new Error("jwt_validation_failed");
+  return vi.fn<ClerkValidator>(async () => null);
+}
+
+function throwingValidator() {
+  return vi.fn<ClerkValidator>(async () => {
+    throw new Error("jwks_fetch_failed");
   });
 }
 
@@ -88,7 +95,7 @@ describe("unknown path", () => {
   });
 });
 
-describe("/mcp — local mode (no STYTCH_PROJECT_ID)", () => {
+describe("/mcp — local mode (no CLERK_SECRET_KEY)", () => {
   it("missing Authorization returns 401 with local WWW-Authenticate", async () => {
     const fetch = makeFetchHandler(stubMcp());
     const res = await fetch(
@@ -178,7 +185,19 @@ describe("/mcp — local mode (no STYTCH_PROJECT_ID)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("GET /authorize returns 404 in local mode", async () => {
+  it("GET /.well-known/oauth-protected-resource returns 404 in local mode", async () => {
+    const fetch = makeFetchHandler(stubMcp());
+    const res = await fetch(
+      new Request("https://example.com/.well-known/oauth-protected-resource", {
+        method: "GET",
+      }),
+      makeLocalEnv(),
+      ctx,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /authorize is a plain 404 in local mode (no authorize route exists)", async () => {
     const fetch = makeFetchHandler(stubMcp());
     const res = await fetch(
       new Request("https://example.com/authorize?response_type=code", {
@@ -191,11 +210,11 @@ describe("/mcp — local mode (no STYTCH_PROJECT_ID)", () => {
   });
 });
 
-describe("/mcp — prod mode (STYTCH_PROJECT_ID set)", () => {
-  it("valid JWT → 200 + claims attached to ctx.props + delegated", async () => {
+describe("/mcp — prod mode (CLERK_SECRET_KEY set)", () => {
+  it("valid JWT → 200 + auth attached to ctx.props + delegated", async () => {
     const mcp = stubMcp("delegated");
-    const claims = makeClaims({ subject: "user-test-max" });
-    const validator = okValidator(claims);
+    const auth = makeAuth({ userId: "user_test_max" });
+    const validator = okValidator(auth);
     const fetch = makeFetchHandler(mcp, { validator });
 
     const prodCtx = { ...ctx } as ExecutionContext;
@@ -212,16 +231,15 @@ describe("/mcp — prod mode (STYTCH_PROJECT_ID set)", () => {
     expect(mcp.fetch).toHaveBeenCalledTimes(1);
     expect(validator).toHaveBeenCalledTimes(1);
     expect(validator).toHaveBeenCalledWith(
-      "eyJvalid.jwt.token",
-      expect.objectContaining({ STYTCH_PROJECT_ID: "project-test-abc" }),
+      expect.any(Request),
+      expect.objectContaining({ CLERK_SECRET_KEY: "sk_live_test-secret" }),
     );
     expect(
-      (prodCtx as unknown as { props: { claims: StytchClaims } }).props.claims
-        .subject,
-    ).toBe("user-test-max");
+      (prodCtx as unknown as { props: { auth: ClerkAuth } }).props.auth.userId,
+    ).toBe("user_test_max");
   });
 
-  it("invalid JWT → 401 with resource_metadata_uri WWW-Authenticate", async () => {
+  it("invalid JWT (validator returns null) → 401 with resource_metadata_uri WWW-Authenticate", async () => {
     const mcp = stubMcp();
     const validator = rejectingValidator();
     const fetch = makeFetchHandler(mcp, { validator });
@@ -239,6 +257,24 @@ describe("/mcp — prod mode (STYTCH_PROJECT_ID set)", () => {
     expect(res.headers.get("www-authenticate")).toContain(
       'resource_metadata_uri=".well-known/oauth-protected-resource"',
     );
+    expect(mcp.fetch).not.toHaveBeenCalled();
+  });
+
+  it("validator throws → 401 (JWKS failure is not a 500 to the client)", async () => {
+    const mcp = stubMcp();
+    const validator = throwingValidator();
+    const fetch = makeFetchHandler(mcp, { validator });
+
+    const res = await fetch(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { Authorization: "Bearer eyJvalid.jwt.token" },
+      }),
+      makeProdEnv(),
+      ctx,
+    );
+
+    expect(res.status).toBe(401);
     expect(mcp.fetch).not.toHaveBeenCalled();
   });
 
@@ -275,52 +311,67 @@ describe("/mcp — prod mode (STYTCH_PROJECT_ID set)", () => {
     expect(res.status).toBe(401);
     expect(validator).not.toHaveBeenCalled();
   });
+
+  it("empty Bearer token → 401 (no validator call)", async () => {
+    const mcp = stubMcp();
+    const validator = okValidator();
+    const fetch = makeFetchHandler(mcp, { validator });
+
+    const res = await fetch(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { Authorization: "Bearer " },
+      }),
+      makeProdEnv(),
+      ctx,
+    );
+
+    expect(res.status).toBe(401);
+    expect(validator).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
-  it("returns 200 JSON with required fields pointing at Stytch (test host for project-test)", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://gc.leiserson.me/.well-known/oauth-authorization-server",
-        { method: "GET" },
-      ),
-      makeProdEnv("project-test-abc"),
-      ctx,
+  it("proxies Clerk's FAPI discovery doc verbatim", async () => {
+    const upstreamBody = JSON.stringify({
+      issuer: TEST_FAPI_URL,
+      authorization_endpoint: `${TEST_FAPI_URL}/oauth/authorize`,
+      token_endpoint: `${TEST_FAPI_URL}/oauth/token`,
+      registration_endpoint: `${TEST_FAPI_URL}/oauth/register`,
+      jwks_uri: `${TEST_FAPI_URL}/.well-known/jwks.json`,
+    });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(upstreamBody, {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
     );
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("application/json");
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.issuer).toBe("https://gc.leiserson.me");
-    expect(body.authorization_endpoint).toBe(
-      "https://gc.leiserson.me/authorize",
-    );
-    expect(body.token_endpoint).toBe(
-      "https://test.stytch.com/v1/public/project-test-abc/oauth2/token",
-    );
-    expect(body.registration_endpoint).toBe(
-      "https://test.stytch.com/v1/public/project-test-abc/oauth2/register",
-    );
-    expect(body.code_challenge_methods_supported).toEqual(["S256"]);
-    expect(body.grant_types_supported).toContain("authorization_code");
-  });
+    try {
+      const fetch = makeFetchHandler(stubMcp());
+      const res = await fetch(
+        new Request(
+          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+          { method: "GET" },
+        ),
+        makeProdEnv(),
+        ctx,
+      );
 
-  it("uses api.stytch.com for project-live project IDs", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://gc.leiserson.me/.well-known/oauth-authorization-server",
-        { method: "GET" },
-      ),
-      makeProdEnv("project-live-xyz"),
-      ctx,
-    );
-
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.token_endpoint).toBe(
-      "https://api.stytch.com/v1/public/project-live-xyz/oauth2/token",
-    );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("application/json");
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.issuer).toBe(TEST_FAPI_URL);
+      expect(body.jwks_uri).toBe(`${TEST_FAPI_URL}/.well-known/jwks.json`);
+      expect(body.registration_endpoint).toBe(
+        `${TEST_FAPI_URL}/oauth/register`,
+      );
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${TEST_FAPI_URL}/.well-known/oauth-authorization-server`,
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("non-GET method returns 405", async () => {
@@ -338,51 +389,43 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
   });
 });
 
-describe("/authorize — prod mode", () => {
-  it("GET forwards query params to Stytch's hosted consent page (302)", async () => {
+describe("GET /.well-known/oauth-protected-resource — prod mode", () => {
+  it("returns 200 JSON with Clerk-shaped protected-resource metadata", async () => {
     const fetch = makeFetchHandler(stubMcp());
     const res = await fetch(
       new Request(
-        "https://gc.leiserson.me/authorize?response_type=code&client_id=c&redirect_uri=https%3A%2F%2Fapp%2Fcb&state=xyz",
-        { method: "GET", redirect: "manual" },
+        "https://gc.leiserson.me/.well-known/oauth-protected-resource",
+        { method: "GET" },
       ),
       makeProdEnv(),
       ctx,
     );
 
-    expect(res.status).toBe(302);
-    const location = res.headers.get("location");
-    expect(location).toBeTruthy();
-    const loc = new URL(location as string);
-    expect(loc.origin).toBe("https://stytch.com");
-    expect(loc.pathname).toBe("/oauth/authorize");
-    expect(loc.searchParams.get("response_type")).toBe("code");
-    expect(loc.searchParams.get("client_id")).toBe("c");
-    expect(loc.searchParams.get("redirect_uri")).toBe("https://app/cb");
-    expect(loc.searchParams.get("state")).toBe("xyz");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.resource).toBe("https://gc.leiserson.me/");
+    expect(body.authorization_servers).toEqual([TEST_FAPI_URL]);
+    expect(body.jwks_uri).toBe(`${TEST_FAPI_URL}/.well-known/jwks.json`);
+    expect(body.token_introspection_endpoint).toBe(
+      `${TEST_FAPI_URL}/oauth/token`,
+    );
+    const challenges = body.key_challenges_supported as Array<{
+      challenge_algs: string[];
+    }>;
+    expect(challenges[0].challenge_algs).toContain("S256");
   });
 
-  it("POST also accepted (clients may send either)", async () => {
+  it("non-GET method returns 405", async () => {
     const fetch = makeFetchHandler(stubMcp());
     const res = await fetch(
-      new Request("https://example.com/authorize?response_type=code", {
+      new Request("https://example.com/.well-known/oauth-protected-resource", {
         method: "POST",
-        redirect: "manual",
       }),
       makeProdEnv(),
       ctx,
     );
-    expect(res.status).toBe(302);
-  });
-
-  it("PUT returns 405 with Allow header", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/authorize", { method: "PUT" }),
-      makeProdEnv(),
-      ctx,
-    );
     expect(res.status).toBe(405);
-    expect(res.headers.get("allow")).toBe("GET, POST");
+    expect(res.headers.get("allow")).toContain("GET");
   });
 });

@@ -1,17 +1,17 @@
 import {
-  type StytchClaims,
-  type StytchValidator,
-  stytchPublicBase,
+  type ClerkAuth,
+  type ClerkValidator,
+  deriveFapiUrl,
   timingSafeEqual,
-  validateStytchJwt,
+  validateClerkOauthToken,
 } from "./auth";
 
 interface Env {
   MCP_BEARER_TOKEN?: string;
   MCP_OBJECT: DurableObjectNamespace;
   DB: D1Database;
-  STYTCH_PROJECT_ID?: string;
-  STYTCH_SECRET?: string;
+  CLERK_SECRET_KEY?: string;
+  CLERK_PUBLISHABLE_KEY?: string;
 }
 
 export interface McpFetcher {
@@ -19,7 +19,7 @@ export interface McpFetcher {
 }
 
 const BANNER =
-  "gc-erp-mcp-server\nPOST /mcp — prod: OAuth 2.1 + DCR via Stytch · local: Authorization: Bearer <token>\n";
+  "gc-erp-mcp-server\nPOST /mcp — prod: OAuth 2.1 + DCR via Clerk · local: Authorization: Bearer <token>\n";
 
 const UNAUTH_WWW_AUTH_PROD =
   'Bearer resource_metadata_uri=".well-known/oauth-protected-resource"';
@@ -34,34 +34,15 @@ const METHOD_NOT_ALLOWED = (allow: string): Response =>
   });
 
 function isProdMode(env: Env): boolean {
-  return Boolean(env.STYTCH_PROJECT_ID);
+  return Boolean(env.CLERK_SECRET_KEY);
 }
 
-function oauthAuthorizationServerMetadata(
-  originUrl: URL,
-  projectId: string,
-): object {
-  const origin = `${originUrl.protocol}//${originUrl.host}`;
-  const stytchBase = stytchPublicBase(projectId);
-  return {
-    issuer: origin,
-    authorization_endpoint: `${origin}/authorize`,
-    token_endpoint: `${stytchBase}/oauth2/token`,
-    registration_endpoint: `${stytchBase}/oauth2/register`,
-    response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "refresh_token"],
-    code_challenge_methods_supported: ["S256"],
-    token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
-    scopes_supported: ["openid", "profile", "email", "offline_access"],
-  };
-}
-
-function jsonResponse(body: object): Response {
+function jsonResponse(body: object, cacheSeconds = 300): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=300",
+      "cache-control": `public, max-age=${cacheSeconds}`,
     },
   });
 }
@@ -77,33 +58,59 @@ function unauthorized(env: Env): Response {
   });
 }
 
-function handleDiscovery(url: URL, req: Request, env: Env): Response {
+async function handleDiscovery(req: Request, env: Env): Promise<Response> {
   if (!isProdMode(env)) return NOT_FOUND();
   if (req.method !== "GET") return METHOD_NOT_ALLOWED("GET");
-  // isProdMode verifies STYTCH_PROJECT_ID is set.
-  const projectId = env.STYTCH_PROJECT_ID as string;
-  return jsonResponse(oauthAuthorizationServerMetadata(url, projectId));
+  // isProdMode verifies CLERK_SECRET_KEY is set; CLERK_PUBLISHABLE_KEY is
+  // always set alongside (sync-secrets guarantees both flow from the same
+  // Clerk instance).
+  const publishableKey = env.CLERK_PUBLISHABLE_KEY as string;
+  const fapiUrl = deriveFapiUrl(publishableKey);
+  const upstream = await fetch(
+    `${fapiUrl}/.well-known/oauth-authorization-server`,
+  );
+  return new Response(await upstream.text(), {
+    status: upstream.status,
+    headers: {
+      "content-type":
+        upstream.headers.get("content-type") ??
+        "application/json; charset=utf-8",
+      "cache-control": "public, max-age=300",
+    },
+  });
 }
 
-function handleAuthorize(url: URL, req: Request, env: Env): Response {
+function handleProtectedResource(url: URL, req: Request, env: Env): Response {
   if (!isProdMode(env)) return NOT_FOUND();
-  if (req.method !== "GET" && req.method !== "POST") {
-    return METHOD_NOT_ALLOWED("GET, POST");
-  }
-  // Hand off to Stytch's hosted consent UI (Connected Apps). Query params
-  // from the MCP client — response_type, client_id, redirect_uri,
-  // code_challenge, state, scope, … — forward verbatim. Stytch's consent
-  // page runs the email-OTP login per ADR 0010.
-  const stytchAuthorize = new URL("https://stytch.com/oauth/authorize");
-  for (const [k, v] of url.searchParams) {
-    stytchAuthorize.searchParams.append(k, v);
-  }
-  return Response.redirect(stytchAuthorize.toString(), 302);
+  if (req.method !== "GET") return METHOD_NOT_ALLOWED("GET");
+  const publishableKey = env.CLERK_PUBLISHABLE_KEY as string;
+  const fapiUrl = deriveFapiUrl(publishableKey);
+  const origin = `${url.protocol}//${url.host}`;
+  return jsonResponse({
+    resource: `${origin}/`,
+    authorization_servers: [fapiUrl],
+    token_types_supported: ["urn:ietf:params:oauth:token-type:access_token"],
+    token_introspection_endpoint: `${fapiUrl}/oauth/token`,
+    token_introspection_endpoint_auth_methods_supported: [
+      "client_secret_post",
+      "client_secret_basic",
+    ],
+    jwks_uri: `${fapiUrl}/.well-known/jwks.json`,
+    authorization_data_types_supported: ["oauth_scope"],
+    authorization_data_locations_supported: ["header", "body"],
+    key_challenges_supported: [
+      {
+        challenge_type: "urn:ietf:params:oauth:pkce:code_challenge",
+        challenge_algs: ["S256"],
+      },
+    ],
+    service_documentation: "https://clerk.com/docs",
+  });
 }
 
 interface McpDeps {
   mcp: McpFetcher;
-  validator: StytchValidator;
+  validator: ClerkValidator;
 }
 
 async function handleMcp(
@@ -115,13 +122,13 @@ async function handleMcp(
   const authHeader = req.headers.get("authorization") ?? "";
 
   if (isProdMode(env)) {
-    const claims = await authenticateStytch(authHeader, env, deps.validator);
-    if (!claims) return unauthorized(env);
+    const auth = await authenticateClerk(req, authHeader, env, deps.validator);
+    if (!auth) return unauthorized(env);
     // McpAgent reads request-scoped auth props from ctx.props — the
     // agents/mcp binding exposes them to tool handlers via
     // getMcpAuthContext(). The binding does not expose typed props on
     // ExecutionContext, so a cast is the documented pattern.
-    (ctx as unknown as { props: unknown }).props = { claims };
+    (ctx as unknown as { props: unknown }).props = { auth };
     return deps.mcp.fetch(req, env, ctx);
   }
 
@@ -134,24 +141,23 @@ async function handleMcp(
   return deps.mcp.fetch(req, env, ctx);
 }
 
-async function authenticateStytch(
+async function authenticateClerk(
+  req: Request,
   authHeader: string,
   env: Env,
-  validator: StytchValidator,
-): Promise<StytchClaims | null> {
+  validator: ClerkValidator,
+): Promise<ClerkAuth | null> {
   if (!authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.slice("Bearer ".length);
-  if (!token) return null;
+  if (!authHeader.slice("Bearer ".length)) return null;
   try {
-    const { claims } = await validator(token, env);
-    return claims;
+    return await validator(req, env);
   } catch {
     return null;
   }
 }
 
 export interface HandlerDeps {
-  validator?: StytchValidator;
+  validator?: ClerkValidator;
 }
 
 export function makeFetchHandler(
@@ -160,7 +166,7 @@ export function makeFetchHandler(
 ): (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response> {
   const mcpDeps: McpDeps = {
     mcp,
-    validator: deps.validator ?? validateStytchJwt,
+    validator: deps.validator ?? validateClerkOauthToken,
   };
 
   return async function fetch(req, env, ctx) {
@@ -173,11 +179,11 @@ export function makeFetchHandler(
     }
 
     if (url.pathname === "/.well-known/oauth-authorization-server") {
-      return handleDiscovery(url, req, env);
+      return handleDiscovery(req, env);
     }
 
-    if (url.pathname === "/authorize") {
-      return handleAuthorize(url, req, env);
+    if (url.pathname === "/.well-known/oauth-protected-resource") {
+      return handleProtectedResource(url, req, env);
     }
 
     if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {

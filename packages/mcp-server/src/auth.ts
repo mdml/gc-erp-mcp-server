@@ -1,5 +1,4 @@
-import type { IntrospectTokenClaims } from "stytch";
-import * as stytch from "stytch";
+import { createClerkClient } from "@clerk/backend";
 
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -8,38 +7,53 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export interface StytchEnv {
-  STYTCH_PROJECT_ID?: string;
-  STYTCH_SECRET?: string;
+export interface ClerkEnv {
+  CLERK_SECRET_KEY?: string;
+  CLERK_PUBLISHABLE_KEY?: string;
 }
 
-export type StytchClaims = IntrospectTokenClaims;
+export interface ClerkAuth {
+  userId: string;
+  scopes: string[];
+  clientId: string;
+}
 
-export type StytchValidator = (
-  token: string,
-  env: StytchEnv,
-) => Promise<{ claims: StytchClaims }>;
+export type ClerkValidator = (
+  req: Request,
+  env: ClerkEnv,
+) => Promise<ClerkAuth | null>;
 
-/* v8 ignore start -- Stytch SDK boundary: constructs a client and delegates
-   JWT validation + JWKS fetch. Unit tests inject a stub StytchValidator via
-   makeFetchHandler deps; exercising this directly would mean running jose's
-   JWKS flow against a live Stytch project. */
-export const validateStytchJwt: StytchValidator = async (token, env) => {
-  if (!env.STYTCH_PROJECT_ID || !env.STYTCH_SECRET) {
-    throw new Error("Stytch is not configured");
+/* v8 ignore start -- Clerk SDK boundary: constructs a client and delegates
+   JWT validation + JWKS fetch. Unit tests inject a stub ClerkValidator via
+   makeFetchHandler deps; exercising this directly would mean running Clerk's
+   JWKS flow against a live instance. */
+export const validateClerkOauthToken: ClerkValidator = async (req, env) => {
+  if (!env.CLERK_SECRET_KEY || !env.CLERK_PUBLISHABLE_KEY) {
+    throw new Error("Clerk is not configured");
   }
-  const client = new stytch.Client({
-    project_id: env.STYTCH_PROJECT_ID,
-    secret: env.STYTCH_SECRET,
+  const clerk = createClerkClient({
+    secretKey: env.CLERK_SECRET_KEY,
+    publishableKey: env.CLERK_PUBLISHABLE_KEY,
   });
-  const claims = await client.idp.introspectTokenLocal(token);
-  return { claims };
+  const state = await clerk.authenticateRequest(req, {
+    acceptsToken: "oauth_token",
+  });
+  if (!state.isAuthenticated) return null;
+  const auth = state.toAuth();
+  return {
+    userId: auth.userId,
+    scopes: [...auth.scopes],
+    clientId: auth.clientId,
+  };
 };
 /* v8 ignore stop */
 
-export function stytchPublicBase(projectId: string): string {
-  const host = projectId.startsWith("project-live-")
-    ? "https://api.stytch.com"
-    : "https://test.stytch.com";
-  return `${host}/v1/public/${projectId}`;
+// Clerk encodes the Frontend API URL in the publishable key itself — strip the
+// `pk_(test|live)_` prefix, base64-decode, strip the trailing `$`. Mirrors
+// @clerk/mcp-tools' deriveFapiUrl. Pure + deterministic, so discovery-doc and
+// protected-resource handlers can derive it without a Clerk API call.
+export function deriveFapiUrl(publishableKey: string): string {
+  const key = publishableKey.replace(/^pk_(test|live)_/, "");
+  const decoded = atob(key);
+  return `https://${decoded.replace(/\$/, "")}`;
 }
