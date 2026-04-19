@@ -309,6 +309,7 @@ Pointers into the roadmap — things the architecture has slots for but doesn't 
 - **Pay-app PDF generation** — M5. Renders G702/G703 from a job's commitment + cost state. Likely a separate `packages/pay-app/` or an inline module on mcp-server.
 - **Integrations** — email ingestion for invoices, QuickBooks push, lien-waiver tracking. Milestone-dependent.
 - **Broader login methods beyond email OTP** — [ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md) adopts Stytch Connected Apps scoped to **email OTP only** (one-time 6-digit passcode). If/when we onboard users beyond Max + Salman, we can enable magic links, passwords, Google / GitHub OAuth, or enterprise SSO via Stytch's dashboard — no Worker-side code change, just a project-level toggle.
+- **Local dev server lifecycle** — `turbo run dev` runs foreground in a terminal; Claude Desktop's `gc-erp-local` entry only resolves while it's up. [ADR 0011](../decisions/0011-local-mcp-dev-server-foreground.md) rejects daemonization (opacity risk) and shipping a standalone binary (runtime fork). Re-evaluate if the manual-start step materially slows real dogfood sessions.
 - **CI** — no GitHub Actions yet. Pre-push + pre-commit cover local discipline; CI enters when remote collaboration does.
 - **ADR log** — [docs/decisions/](../decisions/) has the template + one seeded ADR. When a decision is non-obvious enough that we'd otherwise re-litigate it in a year, write an ADR.
 
