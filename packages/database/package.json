@@ -7,7 +7,9 @@
     "./schema": "./src/schema/index.ts",
     "./ids": "./src/ids/index.ts",
     "./invariants": "./src/invariants/index.ts",
-    "./client": "./src/client.ts"
+    "./projections": "./src/projections/index.ts",
+    "./client": "./src/client.ts",
+    "./seed": "./src/seed/index.ts"
   },
   "scripts": {
     "lint": "biome check .",
@@ -16,8 +18,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:seed:activities": "bun run src/seed/run.ts activities",
-    "db:seed:kitchen-fixture": "bun run src/seed/run.ts kitchen-fixture"
+    "db:seed:kitchen:local": "bun run src/seed/run.ts kitchen-fixture"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

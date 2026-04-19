@@ -33,7 +33,8 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 
 ## Runtime / MCP
 
-- [ ] **Where does the server run long-term?** Local process (`npx`), hosted, or both? Affects auth and multi-device story.
+- [x] ~~OAuth on the Worker — unblock claude.ai web + mobile.~~ *Resolved: [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) — adopt Clerk as the OAuth 2.1 AS (hosted consent for DCR clients, `@clerk/backend` on Workers, proxied discovery doc). Supersedes ADR 0010 (Stytch). Local dev keeps the static bearer gate.*
+- [x] ~~Where does the server run long-term? Local process (`npx`), hosted, or both? Affects auth and multi-device story.~~ *Resolved: hosted on Cloudflare at `gc.leiserson.me` ([ADR 0002](../decisions/0002-infra-cli.md)); prod auth is Clerk OAuth ([ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), local stays on a static bearer for scenario-runner simplicity.*
 - [ ] **Which MCP app ships first.** Leaning: cost-entry form at M3, job dashboard at M4, pay app generator at M5. See [milestones.md](milestones.md).
 - [ ] **How Claude picks an app.** Return type? Explicit hints? Re-read the MCP Apps extension spec before M3.
 
@@ -41,6 +42,10 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 
 - [ ] **Project-level commitments.** Architect, GL insurance, permitting fees often span multiple jobs. v1 puts commitments on jobs; revisit when >1 job per project exists.
 - [ ] **Contract roll-down.** Client contract is typically project-level but billing is per job. Probably a `contractRef` field on Project, pay apps still job-level.
+
+## Dev tooling
+
+- [ ] **Wire `db:seed:kitchen:local` to D1.** The script exists (root + `packages/database/db:seed:kitchen:local`) but its handler in [`packages/database/src/seed/run.ts`](../../packages/database/src/seed/run.ts) still exits 1 with "D1 provisioning pending". Seeder logic in [`packages/database/src/seed/kitchen-fixture.ts`](../../packages/database/src/seed/kitchen-fixture.ts) runs against better-sqlite3 in tests; rewiring it to local D1 follows the same shape as the activities seed — render SQL from the fixture, write to a tempfile, hand to `wrangler d1 execute gc-erp --local --file`. Reference implementation: [`packages/dev-tools/src/db/seed-activities.ts`](../../packages/dev-tools/src/db/seed-activities.ts).
 
 ## File ingestion
 

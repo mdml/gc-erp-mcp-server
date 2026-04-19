@@ -8,7 +8,7 @@ See [SPEC.md](./SPEC.md) for the data model, a narrative walkthrough, and open q
 
 - **Runtime:** Cloudflare Workers (remote HTTP, reachable from phones).
 - **MCP transport:** streamable HTTP via Cloudflare's [`agents`](https://developers.cloudflare.com/agents/) `McpAgent` (each session backed by a Durable Object).
-- **Auth:** bearer token. Shared between Max + Salman via 1Password.
+- **Auth:** OAuth 2.1 + DCR via [Clerk](https://clerk.com) in prod (hosted consent for DCR clients — see [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md)); static bearer token in local dev.
 - **Tools (v0.0.1):** `ping`, `list_jobs` (returns `[]`).
 
 ## Layout
@@ -65,7 +65,7 @@ turbo run sync-secrets       # team secrets (required) + developer secrets (best
 direnv allow                 # one-time; direnv will now auto-load on cd
 ```
 
-After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MCP_BEARER_TOKEN`, plus any developer secrets you provided refs for. Rotate by re-running `turbo run sync-secrets` + `direnv reload`.
+After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MCP_BEARER_TOKEN` (local-only fixture; prod uses OAuth per [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md)), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, plus any developer secrets you provided refs for. Rotate by re-running `turbo run sync-secrets` + `direnv reload`.
 
 ## Local dev
 
@@ -95,17 +95,23 @@ turbo run deploy
 
 Serves at `https://gc.leiserson.me`; the MCP path is `/mcp`. The `*.workers.dev` fallback is disabled in `wrangler.jsonc` so there's a single canonical hostname.
 
-**One-time per environment**: the bearer value lives in 1Password and needs to be uploaded as a Cloudflare secret so the deployed Worker can authenticate requests. Do this once (and whenever the bearer rotates):
+**One-time per environment**: the Clerk OAuth credentials live in 1Password and need to be uploaded as Cloudflare secrets so the deployed Worker can validate incoming JWTs. Do this once (and whenever they rotate):
 
 ```bash
-(cd packages/mcp-server && op read "op://gc-erp/mcp-bearer/credential" | bunx wrangler secret put MCP_BEARER_TOKEN)
+(cd packages/mcp-server && op read "op://gc-erp/clerk/secret-key"      | bunx wrangler secret put CLERK_SECRET_KEY)
+(cd packages/mcp-server && op read "op://gc-erp/clerk/publishable-key" | bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
 ```
 
-Piping direct from `op read` keeps the value out of shell history and off disk. This is the intentional out-of-band step — not automated in v1.
+Piping direct from `op read` keeps the values out of shell history and off disk. This is the intentional out-of-band step — not automated in v1. No `MCP_BEARER_TOKEN` is uploaded to prod; the bearer path only runs under `wrangler dev`.
 
 ## Connect from a client
 
-Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`, with `Authorization: Bearer <token>` as the auth header. Exact steps depend on the client (Claude Desktop, Claude web, Claude mobile). Once connected, `ping` and `list_jobs` show up in the tool list.
+Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`. The client shape differs by platform:
+
+- **claude.ai (web + iOS + Android):** paste the URL into Settings → Connectors → Add custom connector. Auth field stays blank — claude.ai speaks MCP OAuth + DCR natively.
+- **Claude Desktop (Mac):** Desktop's config file is stdio-only, so it connects via the `mcp-remote` bridge (which itself speaks the MCP OAuth flow). `bun run install:mcp:prod` prints the exact JSON block.
+
+Either way, the first connection pops a browser for Clerk's hosted consent page: sign in (or sign up) with whatever method you enabled on the Clerk instance, approve the scopes. See [`docs/guides/dogfood.md`](docs/guides/dogfood.md) for the full per-client setup, and [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) for why static bearer headers don't work with claude.ai and why Clerk hosts the consent UI end-to-end.
 
 ## Scripts (root)
 

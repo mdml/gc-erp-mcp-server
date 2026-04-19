@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DeveloperSecret, TeamSecret } from "./secrets.config";
 import {
+  buildDevVarsBody,
   classifyDeveloperFetch,
   classifyTeamFetch,
   parseEnvOpLocal,
@@ -154,5 +155,52 @@ describe("classifyDeveloperFetch", () => {
       expect(verdict.reason).toContain("op://Private/codescene/token");
       expect(verdict.reason).toContain("expired credential");
     }
+  });
+});
+
+describe("buildDevVarsBody", () => {
+  it("emits literals when no resolved secrets target dev-vars", () => {
+    const { body, names } = buildDevVarsBody([], { MCP_BEARER_TOKEN: "dev" });
+    expect(body).toBe("MCP_BEARER_TOKEN=dev\n");
+    expect(names).toEqual(["MCP_BEARER_TOKEN"]);
+  });
+
+  it("includes resolved dev-vars secrets alongside literals", () => {
+    const { body, names } = buildDevVarsBody(
+      [{ name: "FOO", value: "bar", targets: ["dev-vars"] }],
+      { MCP_BEARER_TOKEN: "dev" },
+    );
+    expect(names.sort()).toEqual(["FOO", "MCP_BEARER_TOKEN"]);
+    expect(body).toContain("FOO=bar");
+    expect(body).toContain("MCP_BEARER_TOKEN=dev");
+  });
+
+  it("ignores resolved secrets that don't target dev-vars", () => {
+    const { names } = buildDevVarsBody(
+      [{ name: "ENVRC_ONLY", value: "x", targets: ["envrc"] }],
+      {},
+    );
+    expect(names).toEqual([]);
+  });
+
+  it("literals override resolved values of the same name (local stays local)", () => {
+    const { body } = buildDevVarsBody(
+      [
+        {
+          name: "MCP_BEARER_TOKEN",
+          value: "real-prod-token-xyz",
+          targets: ["dev-vars"],
+        },
+      ],
+      { MCP_BEARER_TOKEN: "dev" },
+    );
+    expect(body).toBe("MCP_BEARER_TOKEN=dev\n");
+    expect(body).not.toContain("real-prod-token-xyz");
+  });
+
+  it("emits a single trailing newline (wrangler dotenv parser quirk)", () => {
+    const { body } = buildDevVarsBody([], { MCP_BEARER_TOKEN: "dev" });
+    expect(body.endsWith("\n")).toBe(true);
+    expect(body.endsWith("\n\n")).toBe(false);
   });
 });

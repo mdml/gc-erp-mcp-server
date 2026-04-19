@@ -76,8 +76,8 @@ To change what auto-allows or denies, edit [packages/agent-config/src/policy/](p
 
 ### Runtime
 
-- Every `/mcp*` request must be bearer-authenticated before delegating to `McpAgent`. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix.
-- Constant-time token compare (`timingSafeEqual`) — don't replace with `===`. See [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md) for more.
+- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Clerk-issued OAuth JWT validated via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.CLERK_SECRET_KEY` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) and [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
+- Don't replace `timingSafeEqual` with `===` in the local-bearer path. Clerk's JWT validation handles its own timing-safety.
 - Durable Object migrations are additive. Editing an existing migration retroactively is a data-loss bug.
 
 ### Testing
@@ -117,7 +117,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 
 ### Secrets
 
-- `MCP_BEARER_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` live in 1Password (`gc-erp` vault).
+- Local-only: `MCP_BEARER_TOKEN` (fixed string `dev`). Prod-only: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` (Clerk — see [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md)). Everywhere: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. All live in 1Password (`gc-erp` vault).
 - Never write secrets to source files, commit messages, or stdout. `.dev.vars` and `.envrc.enc` are the only legitimate on-disk homes and both are gitignored.
 - Do not run `wrangler login` — it writes a user-wide OAuth token that bleeds across repos. We use env-var auth via direnv.
 
@@ -141,7 +141,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **Start:** read [`now.md`](docs/product/now.md) + last 1–2 [retros](docs/retros/) + `git log --oneline -10` against the feature branch. **Audit the top `now.md` item against the actual code before acting** — doc-vs-code drift is the #1 friction in this repo.
 - **Default branching:** feature branch (`slice/N-foo` or `feat/topic`) — either solo-on-branch or parallel agents via `claude --worktree` opening PRs back to the feature branch. Merge to `main` only when the whole feature lands.
 - **During:** question → [backlog](docs/product/backlog.md); decision → ADR or SPEC/TOOLS; architecture → [ARCHITECTURE.md](docs/guides/ARCHITECTURE.md) same commit; invariant → per-package `CLAUDE.md`.
-- **End:** update `now.md` (done → "Recently done", keep ≤3); log a [retro](docs/retros/CLAUDE.md) if the session was meaningful; commit everything (retro included) in conventional-commit style. Granularity varies — not one-commit-per-session.
+- **End:** update `now.md` (done → "Recently done", keep ≤3); if anything felt rough or worth remembering, add a one-liner to [`docs/retros/draft.md`](docs/retros/draft.md) — **do not** write a dated retro unless Max explicitly asks ([retros/CLAUDE.md](docs/retros/CLAUDE.md)); commit everything in conventional-commit style. Granularity varies — not one-commit-per-session.
 
 ## Quick links for new contributors
 

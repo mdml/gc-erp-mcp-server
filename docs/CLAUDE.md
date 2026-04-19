@@ -10,7 +10,7 @@ How our docs are organized and when to update each. Each subdirectory has its ow
 | [`docs/guides/`](guides/) | Orientation guides (ARCHITECTURE, etc.) | **Current state** — how things work right now | When architecture or tooling changes |
 | [`docs/decisions/`](decisions/) | Architecture Decision Records (ADRs) | **Why decisions were made** — rationale, options, trade-offs | Per decision; ADRs are immutable once active |
 | [`docs/spikes/`](#spikes) | Active time-boxed investigations | Ephemeral working docs — never permanent | Created and deleted as investigations run |
-| [`docs/retros/`](retros/) | Retro logs — observations, decisions, actions per session | Append-only; daily-ish |
+| [`docs/retros/`](retros/) | [`draft.md`](retros/draft.md) queue of retro-worthy observations + dated retros when Max initiates one | Draft grows continuously; dated retros only on human initiation |
 
 Three files that are *not* under `docs/` but are part of the doc landscape:
 

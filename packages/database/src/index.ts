@@ -9,4 +9,5 @@ export * from "./client";
 export * from "./ids";
 export * from "./invariants";
 export { patchIdFor } from "./patches/hash";
+export * from "./projections";
 export * from "./schema";

@@ -1,7 +1,7 @@
 /**
  * Declarative list of secrets required by gc-erp-mcp-server.
  *
- * Two categories:
+ * Three categories:
  *
  *   - `teamSecrets` — shared across the team; the 1Password ref is a project
  *     fact (vault = gc-erp). `sync-secrets` fetches these by baked
@@ -14,9 +14,18 @@
  *     whether the *downstream* consumer tolerates the absence is the
  *     consumer's choice — see each secret's `description` for details.
  *
+ *   - `localDevVars` — fixed literal values written to `.dev.vars` for local
+ *     dev. NOT secrets — local D1 holds no real data, so e.g. the bearer
+ *     token is a hardcoded `dev`. Listed here (not inlined in sync-secrets)
+ *     for grep-ability and to keep all `.dev.vars` sources in one file.
+ *     See [docs/guides/dogfood.md §Auth story].
+ *
  * `sync-secrets` writes each secret to its listed targets:
  *   - 'envrc':    encrypted into /.envrc.enc (loaded into the shell by direnv)
  *   - 'dev-vars': plaintext into packages/mcp-server/.dev.vars (read by `wrangler dev`)
+ *
+ * `localDevVars` always writes to .dev.vars and overrides any team/dev secret
+ * of the same name to enforce the "local stays local" invariant.
  */
 
 export type SecretTarget = "envrc" | "dev-vars";
@@ -47,9 +56,37 @@ export const teamSecrets: TeamSecret[] = [
   {
     name: "MCP_BEARER_TOKEN",
     opRef: "op://gc-erp/mcp-bearer/credential",
-    targets: ["envrc", "dev-vars"],
+    // Prod token only flows to the shell env (via direnv). Local .dev.vars
+    // gets the literal `dev` from `localDevVars` below — see file header.
+    targets: ["envrc"],
+  },
+  {
+    // Clerk OAuth credentials (ADR 0012). envrc-only — local mode
+    // is deliberately gated on the ABSENCE of CLERK_SECRET_KEY, so these
+    // must never land in .dev.vars.
+    name: "CLERK_PUBLISHABLE_KEY",
+    opRef: "op://gc-erp/clerk/publishable-key",
+    targets: ["envrc"],
+  },
+  {
+    name: "CLERK_SECRET_KEY",
+    opRef: "op://gc-erp/clerk/secret-key",
+    targets: ["envrc"],
   },
 ];
+
+/**
+ * Fixed literal values written to packages/mcp-server/.dev.vars on every
+ * `bun run sync-secrets`. NOT secrets — these are dev-only defaults that
+ * exist in source. Local D1 holds no real data, so the bearer is hardcoded
+ * `dev`. Adding a real prod-only secret here would be a bug.
+ *
+ * Overrides any team/dev secret of the same name (so even if MCP_BEARER_TOKEN
+ * sneaks back into a `dev-vars` target by accident, local stays local).
+ */
+export const localDevVars: Record<string, string> = {
+  MCP_BEARER_TOKEN: "dev",
+};
 
 export const developerSecrets: DeveloperSecret[] = [
   {

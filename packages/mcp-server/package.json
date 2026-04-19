@@ -15,6 +15,7 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
+    "@clerk/backend": "3.2.13",
     "@gc-erp/database": "workspace:*",
     "@modelcontextprotocol/sdk": "1.29.0",
     "agents": "0.11.0",
@@ -22,6 +23,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
+    "@clerk/mcp-tools": "0.3.1",
     "@cloudflare/workers-types": "4.20260415.1",
     "@types/better-sqlite3": "7.6.13",
     "@vitest/coverage-v8": "4.1.4",

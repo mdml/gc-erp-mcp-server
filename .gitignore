@@ -28,3 +28,6 @@ coverage/
 
 # Logs
 *.log
+
+# Scratch / working docs (session prompts, handoffs — keep out of history)
+PROMPTS.md

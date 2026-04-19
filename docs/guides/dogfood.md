@@ -10,23 +10,23 @@ Two targets exist; all tooling is aware of both.
 | **URL** | `http://localhost:8787/mcp` | `https://gc.leiserson.me/mcp` |
 | **Runtime** | `wrangler dev` (hot-reload) | Deployed Cloudflare Worker |
 | **Database** | Local D1 file — `.wrangler/state/v3/d1/` | Live D1 (`gc-erp`) in Cloudflare |
-| **Bearer token** | `MCP_BEARER_TOKEN` from `.dev.vars` | `MCP_BEARER_TOKEN` from 1Password `gc-erp` vault (loaded by direnv) |
+| **Auth** | Static bearer — `MCP_BEARER_TOKEN=dev` from `.dev.vars` | **OAuth 2.1 + DCR via Clerk** (hosted consent — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)) |
 | **Cost to touch** | Free — no real data at risk | Real data; writes are permanent |
 | **When to use** | Tool development, scenario runs, iteration | Actual GC work, dogfood sessions, client config |
 
 **Principle: local for experiments, prod for real work.**
 Local is cheap and resettable. Prod is where the job history lives.
 
-## Bearer token story
+## Auth story
 
-Both targets share the same env-var name (`MCP_BEARER_TOKEN`) and the server checks it on every request — but the values have different weight:
+The two targets use different auth mechanisms on purpose — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) for the full rationale.
 
-- **Local:** the fixed string `dev`. Hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes `Authorization: Bearer dev` directly into the Desktop config — no secret lookup, nothing sensitive in the file.
-- **Prod:** a real random secret stored in 1Password `gc-erp` vault → decrypted into `.envrc.enc` → loaded by `direnv` on shell entry. Available in your terminal as `$MCP_BEARER_TOKEN` whenever `direnv` is active. Never printed to stdout by any script.
+- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `packages/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
+- **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker proxies Clerk's `/.well-known/oauth-authorization-server` discovery doc (pointing clients at Clerk's hosted `/oauth/authorize`, `/oauth/token`, `/oauth/register`) and serves its own Clerk-shaped `/.well-known/oauth-protected-resource` metadata. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves via DCR, **redirect through Clerk's hosted consent page** (Clerk hosts the sign-in + scope approval UI — the Worker never renders one), and receive a Clerk-minted access token. The Worker validates that JWT on every `/mcp*` request via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; tool handlers read `userId` / `scopes` / `clientId` via `getMcpAuthContext().auth`.
 
-The auth code path is exercised in both environments (invariant: every `/mcp*` request is bearer-checked). The local token is trivial by design — local D1 holds no real data, so there is nothing worth protecting. The prod token is real and treated accordingly.
+**Why the split:** claude.ai Custom Connectors on web + iOS + Android reject static bearer headers — they implement the MCP OAuth spec strictly. Claude Desktop historically accepted bearer headers, but with OAuth available it should use OAuth too (cleaner, per-user identity, works across all Claude surfaces). Local stays on bearer because the scenario runner is server-to-server and OAuth'ing every script invocation adds setup cost for no real security benefit — local D1 has no real data.
 
-Scripts that talk to prod read `$MCP_BEARER_TOKEN` from the environment. They do not hard-code tokens or print them. If a script needs the token and it isn't set, it should fail loudly with a message pointing at `direnv allow`.
+Scripts that talk to prod (e.g. `scenario kitchen --target prod`) acquire a Clerk-minted access token once (via the `scenario auth` helper — deferred to a future coding slice) and cache it in a gitignored token file. If a script needs a token and none is cached, it should fail loudly with a message telling the operator to run `scenario auth`.
 
 ## Script surface
 
@@ -52,6 +52,8 @@ bun run db:seed:kitchen:local       # SPEC §2 kitchen walkthrough fixture (was:
 
 `db:seed:activities:*` is idempotent — `ON CONFLICT (slug) DO NOTHING`. Safe to run multiple times. The prod variant prints a plan and prompts before executing (see [Plan + confirm pattern](#plan--confirm-pattern)).
 
+> **`db:seed:kitchen:local` is wired but not yet functional.** The script exists at the new name, but its handler still exits with "D1 provisioning pending" — the seeder logic (`packages/database/src/seed/kitchen-fixture.ts`) runs against better-sqlite3 in tests only. Rewiring it to D1 via the same `wrangler d1 execute --file` path as `db:seed:activities:{local,prod}` is tracked in [backlog.md §Dev tooling](../product/backlog.md).
+
 No `db:seed:kitchen:prod` — the kitchen fixture is synthetic test data, not real-work data.
 
 ### Database — ad-hoc queries
@@ -61,7 +63,7 @@ bun run db:query:local "SELECT count(*) FROM activities"
 bun run db:query:prod  "SELECT count(*) FROM activities"
 ```
 
-`db:query:prod` warns and requires confirmation before executing any query containing `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, or `ALTER`. Pass `--yes` to skip the prompt in scripted contexts.
+`db:query:prod` warns and requires confirmation before executing any query containing `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, `ALTER`, or `INSERT`. Pass `--yes` to skip the prompt in scripted contexts.
 
 ### Database — reset (local only)
 
@@ -138,10 +140,16 @@ The entry it writes:
 {
   "mcpServers": {
     "gc-erp-local": {
-      "type": "http",
-      "url": "http://localhost:8787/mcp",
-      "headers": {
-        "Authorization": "Bearer dev"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8787/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer dev"
       }
     }
   }
@@ -150,42 +158,48 @@ The entry it writes:
 
 The token `dev` is the fixed local value from `.dev.vars`. It is not a secret — nothing in local D1 warrants protection.
 
-> **Note:** `type: "http"` requires Claude Desktop ≥ the version that shipped native HTTP MCP support (early 2026). If your Desktop version doesn't support it, fall back to the `mcp-remote` bridge pattern — the script will detect and warn.
+> **Why `mcp-remote` and not `type: "http"`?** Claude Desktop's `claude_desktop_config.json` only accepts stdio entries today; entries with `type: "http"` (or similar streaming-transport shapes) are rejected as "not a valid MCP server configuration" at Desktop startup. We bridge via the `mcp-remote` npm package, which spawns a local stdio proxy that forwards to our HTTP server with the bearer header attached. The space-less `Authorization:${AUTH_HEADER}` + `AUTH_HEADER: "Bearer dev"` env split works around a Claude-Desktop-on-Windows spaces-in-args bug noted in [mcp-remote's readme](https://github.com/geelen/mcp-remote#readme) — Mac tolerates the space-ful form, but the env-split shape is portable.
 
-### `install:mcp:prod` — prints the config block
+> **Why `turbo run dev` stays foreground — no daemon, no binary?** The `localhost:8787` target only answers while `turbo run dev` is running in a terminal, and that's deliberate. Daemonizing via LaunchAgent or wrapping in an on-demand launcher would eliminate the manual-start step but turn the dev server into an invisible background process — exactly where local-vs-prod drift sneaks in. Shipping a true stdio binary would require forking the runtime (no Durable Objects + D1 + R2 outside `workerd`), which breaks the "one Worker ships to prod" invariant in [`packages/mcp-server/CLAUDE.md`](../../packages/mcp-server/CLAUDE.md). Keeping the dev server foreground makes its state visible and its restart intentional, which matches the "local is cheap, resettable, experimental" posture above. Full tradeoffs and rejected options in [ADR 0011](../decisions/0011-local-mcp-dev-server-foreground.md).
 
-Prod credentials should not be written to a local file by a script. Instead, print the block:
+### `install:mcp:prod` — prints the connection guide
+
+Prod uses OAuth (see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), but Claude Desktop's `claude_desktop_config.json` is stdio-only — the same platform constraint that forces the `install:mcp:local` entry above through the `mcp-remote` bridge (the "Why `mcp-remote` and not `type: "http"`?" callout under install:mcp:local has the rationale). What's different for prod is that `mcp-remote` speaks the full MCP OAuth flow natively: it fetches our `/.well-known/oauth-authorization-server` on first run, performs Dynamic Client Registration, pops the system browser for Clerk's hosted consent page, caches the access token under `~/.mcp-auth/`, and refreshes on expiry. So the prod entry needs no `--header`, no `AUTH_HEADER`, no bearer — `mcp-remote` handles authentication end-to-end.
 
 ```
 bun run install:mcp:prod
 ```
 
-Output:
+The output prints this JSON block for `~/Library/Application Support/Claude/claude_desktop_config.json` (alongside any `gc-erp-local` entry):
 
 ```json
 {
   "mcpServers": {
     "gc-erp-prod": {
-      "type": "http",
-      "url": "https://gc.leiserson.me/mcp",
-      "headers": {
-        "Authorization": "Bearer <your MCP_BEARER_TOKEN>"
-      }
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "mcp-remote", "https://gc.leiserson.me/mcp"],
+      "env": { "PATH": "/opt/homebrew/bin:/usr/bin:/bin" }
     }
   }
 }
 ```
 
-Paste this into `claude_desktop_config.json` alongside the `gc-erp-local` entry. The token value is redacted in the printed output — the script uses `$MCP_BEARER_TOKEN` which is already in your environment; copy it in manually.
+Paste it in and restart Claude Desktop. On first connection `mcp-remote` pops a browser window to Clerk's hosted consent page; sign in (or sign up) with whatever method you've enabled on the Clerk instance, approve the scopes. From then on Desktop talks to `mcp-remote`'s stdio proxy, which talks to `https://gc.leiserson.me/mcp` over HTTPS with a Clerk-issued access token; the token is refreshed automatically on expiration.
 
-After editing, restart Claude Desktop. Smoke-test in a conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
+The absolute-path `command` + pinned `PATH` env is the same Node-version caveat `install:mcp:local` carries — `mcp-remote` runs under Desktop's launch-services `PATH`, which may not include your shell's `nvm`/Homebrew bin directory.
+
+Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
+
+**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON (proxied from Clerk's FAPI), (b) your Clerk instance has Dynamic Client Registration toggled on in the OAuth applications dashboard, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
 
 ## Claude.ai Connectors (mobile / web)
 
-Claude iOS and Android support remote MCP connectors. In-app: **Settings → Connectors → Add custom connector**.
+Claude iOS, Android, and web support remote MCP connectors. In-app: **Settings → Connectors → Add custom connector**.
 
 - **URL:** `https://gc.leiserson.me/mcp`
-- **Bearer token:** your `MCP_BEARER_TOKEN` from 1Password `gc-erp` vault
+- **Auth:** leave blank. claude.ai's Custom Connectors only speak OAuth 2.1 + DCR — there's no field for a static bearer token, and that's the reason we adopted Clerk (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)).
+
+On first connection, claude.ai fetches `/.well-known/oauth-authorization-server`, registers itself via DCR, redirects you to Clerk's hosted consent page, and once you've signed in + approved scopes, caches the access token. Subsequent sessions refresh silently.
 
 Local dev is not useful from mobile (localhost doesn't resolve on mobile networks). Prod-only on mobile is the right setup.
 
@@ -214,19 +228,32 @@ Run these in order. Each is independently safe to retry.
 
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
-3. `bun run deploy` — deploy the Worker (denied by default; expect a permission prompt)
-4. Smoke-test:
+3. Verify Clerk OAuth secrets + instance config are in place (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)):
+   - `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` uploaded via `wrangler secret put …`;
+   - Clerk dashboard → OAuth applications → **Dynamic Client Registration toggled on** (so claude.ai can self-register);
+   - No `MCP_BEARER_TOKEN` in prod Cloudflare secrets.
+4. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
+5. Verify the seed:
    ```bash
-   curl -X POST https://gc.leiserson.me/mcp \
-     -H "Authorization: Bearer $MCP_BEARER_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+   bun run db:query:prod "SELECT count(*) FROM activities"
    ```
-   Expect: HTTP 200 with a `tools` array including `apply_patch`, `issue_ntp`, `get_scope_tree`.
+   Expect a count of `22` (the starter library).
+6. Smoke-test OAuth discovery (no auth required):
+   ```bash
+   curl -s https://gc.leiserson.me/.well-known/oauth-authorization-server | jq .
+   ```
+   Expect JSON with `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `jwks_uri` (all pointing at Clerk's FAPI). HTTP 404 → handler not wired; HTTP 500 → `CLERK_*` env not set on the Worker.
+7. Smoke-test end-to-end:
+   ```bash
+   bun run scenario kitchen --target prod
+   ```
+   The prod-confirm prompt prints a plan; type `y`. Expect `✓ scenario completed`.
 
-   HTTP 401 → bearer mismatch. HTTP 500 → runtime error; tail `wrangler tail gc-erp-mcp-server --remote`.
+   This is the load-bearing smoke-test — it exercises the full Day-0 walkthrough (`create_party` → `create_project` → `create_job` → `create_scope` → `apply_patch` → `issue_ntp` → `get_scope_tree`) against live D1 over the real MCP HTTP transport. The scenario runner acquires a Clerk-minted token via the `scenario auth` helper (deferred to a future coding slice) and caches it locally.
 
-5. Optional: `bun run scenario kitchen --target prod` — full Day-0 walkthrough against live infra.
+   On failure: tail the Worker with `bunx wrangler tail gc-erp-mcp-server --remote` from `packages/mcp-server/` and re-run. HTTP 401 from the runner → token expired or invalid; rerun `bun run scenario auth --target prod`.
+
+> **Why not a one-shot `curl`?** The streaming HTTP transport is stateful — `tools/list` requires an `Mcp-Session-Id` header obtained from a prior `initialize` handshake. A single `curl tools/list` returns HTTP 400 with `Mcp-Session-Id header is required`, which looks like a bug but isn't. If you need a curl-level check, do it as two requests: POST `initialize` (capture `Mcp-Session-Id` from the response headers), then POST `tools/list` carrying that header and a valid Clerk-issued bearer. The scenario runner does both for you.
 
 ## Rollback
 

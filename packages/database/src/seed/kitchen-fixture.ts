@@ -8,7 +8,7 @@
  * This is NOT a test fixture. MCP-tool tests must not import from this
  * module; they should build their own in-test shapes to keep coupling tight.
  * Consumers here are:
- *   - the `db:seed:kitchen-fixture` CLI
+ *   - the `db:seed:kitchen:local` CLI
  *   - the idempotency + round-trip tests beside this file
  *
  * Idempotency: each INSERT uses `ON CONFLICT (id) DO NOTHING` (or the
