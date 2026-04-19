@@ -20,6 +20,10 @@ export default defineConfig({
         "src/sync-secrets.ts",
         // Subprocess + file I/O primitives (run, opRead, ageEncrypt, writeAtomic).
         "src/io.ts",
+        // Filesystem reads, atomic writes, npx resolution. Pure helpers
+        // (buildLocalEntry, patchConfig, removeServer) are exported and
+        // tested in install-mcp.test.ts; the file as a whole is orchestration.
+        "src/install-mcp.ts",
         // Pure declarative data.
         "src/secrets.config.ts",
         // Scenario-runner I/O wiring. Correctness is guarded by Layer-1 tool

@@ -118,6 +118,8 @@ Proceed? [y/N]
 Claude Desktop reads `~/Library/Application Support/Claude/claude_desktop_config.json`.
 Name both entries so they coexist — you can have local and prod connected simultaneously and address them explicitly in conversation ("create a job in gc-erp-local").
 
+**Desktop config is stdio-only.** Per the [official MCP docs](https://modelcontextprotocol.io/docs/develop/connect-local-servers), the config file supports only `command` + `args` entries — there is no native `type: "http"`. Remote HTTP MCP servers reach Desktop via the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) npx bridge, which speaks stdio to Desktop and HTTP to the server. (Pro/Teams/Enterprise accounts can alternatively add remote MCP servers via the in-app **Settings → Connectors** UI; that path bypasses the config file entirely and is the right choice for prod on mobile/web — see [§Claude.ai Connectors](#claudeai-connectors-mobile--web).)
+
 ### `install:mcp:local` — writes the config
 
 ```
@@ -128,9 +130,10 @@ bun run install:mcp:local --remove   # remove gc-erp-local entry
 The script:
 1. Reads the existing config (or creates `{}` if none exists).
 2. Backs it up to `claude_desktop_config.json.<timestamp>.bak`.
-3. Patches in (or removes) the `gc-erp-local` entry.
-4. Writes the updated file.
-5. Prints "Restart Claude Desktop to apply changes."
+3. Resolves an absolute path to Homebrew's `npx` (`/opt/homebrew/bin/npx` on Apple Silicon, `/usr/local/bin/npx` on Intel). Fails with a `brew install node` hint if neither exists. See [Node version caveat](#node-version-caveat) for why.
+4. Patches in (or removes) the `gc-erp-local` entry. Other servers (e.g. `filesystem`) and top-level keys (e.g. `preferences`) are preserved untouched.
+5. Atomically writes the updated file.
+6. Prints "Restart Claude Desktop to apply changes."
 
 The entry it writes:
 
@@ -138,19 +141,35 @@ The entry it writes:
 {
   "mcpServers": {
     "gc-erp-local": {
-      "type": "http",
-      "url": "http://localhost:8787/mcp",
-      "headers": {
-        "Authorization": "Bearer dev"
+      "command": "/absolute/path/to/npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8787/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer dev"
       }
     }
   }
 }
 ```
 
+Why the `${AUTH_HEADER}` indirection: `mcp-remote` parses `--header` values verbatim, and a bare `"Bearer dev"` with a space confuses its argv parsing on some Desktop versions. Wrapping the token in an env var — passed through `env` — sidesteps the issue.
+
 The token `dev` is the fixed local value from `.dev.vars`. It is not a secret — nothing in local D1 warrants protection.
 
-> **Note:** `type: "http"` requires Claude Desktop ≥ the version that shipped native HTTP MCP support (early 2026). If your Desktop version doesn't support it, fall back to the `mcp-remote` bridge pattern — the script will detect and warn.
+#### Node version caveat
+
+Claude Desktop on macOS launches from Finder/Launcher and inherits the **macOS launch-services PATH**, not your shell PATH. If you use nvm, Desktop may resolve a bare `npx` to whichever Node version appears first in that inherited PATH — often an ancient install (e.g. Node 16). `mcp-remote`'s transitive dep `wsl-utils` uses modern `node:fs/promises` exports that only exist in Node ≥18, so a stale Node resolution surfaces as:
+
+```
+SyntaxError: The requested module 'node:fs/promises' does not provide an export named 'constants'
+```
+
+**Why Homebrew, not nvm:** Homebrew installs `node` at a stable absolute path (`/opt/homebrew/bin/npx` on Apple Silicon) that doesn't move when you upgrade Node — `brew upgrade node` retargets the symlink. nvm's per-version paths (`~/.nvm/versions/node/v22.21.1/bin/npx`) require re-running `install:mcp:local` after every `nvm install`, and the macOS launch PATH tends to surface the lexicographically-first nvm version rather than the active one. If you only need a single recent Node (and most modern stacks, including this repo's bun-first setup, do), Homebrew is simpler. Run `brew install node` once and `install:mcp:local` will find it.
 
 ### `install:mcp:prod` — prints the config block
 
@@ -160,23 +179,31 @@ Prod credentials should not be written to a local file by a script. Instead, pri
 bun run install:mcp:prod
 ```
 
-Output:
+Output (stdio-bridge form, works in `claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "gc-erp-prod": {
-      "type": "http",
-      "url": "https://gc.leiserson.me/mcp",
-      "headers": {
-        "Authorization": "Bearer <your MCP_BEARER_TOKEN>"
+      "command": "/opt/homebrew/bin/npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://gc.leiserson.me/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer <your MCP_BEARER_TOKEN>"
       }
     }
   }
 }
 ```
 
-Paste this into `claude_desktop_config.json` alongside the `gc-erp-local` entry. The token value is redacted in the printed output — the script uses `$MCP_BEARER_TOKEN` which is already in your environment; copy it in manually.
+Paste this into `claude_desktop_config.json` alongside the `gc-erp-local` entry and substitute your `$MCP_BEARER_TOKEN`. The token value is redacted in the printed output — the script uses `$MCP_BEARER_TOKEN` which is already in your environment; copy it in manually.
+
+**Recommended for prod: use the in-app Connectors UI instead.** Because `gc.leiserson.me` is a public HTTPS URL, you can skip the config file entirely: **Settings → Connectors → Add custom connector** in Claude Desktop. Desktop speaks HTTP directly to the URL — no `mcp-remote`, no Node, no PATH gymnastics. Available on all plans (Free is limited to one custom connector). The Connectors UI is the *only* path that works on Claude.ai web/mobile (see [§Claude.ai Connectors](#claudeai-connectors-mobile--web)) since those clients can't run local stdio bridges. **The config-file form above remains the only option for `gc-erp-local`** — Connectors UI requires connections to originate from Anthropic's servers, which can't reach your localhost.
 
 After editing, restart Claude Desktop. Smoke-test in a conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
 

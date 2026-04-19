@@ -8,6 +8,7 @@
     "code-health": "bun run src/code-health.ts",
     "scenario": "bun run src/scenarios/run.ts",
     "scenario:reset": "bun run src/scenarios/reset-cli.ts",
+    "install:mcp:local": "bun run src/install-mcp.ts",
     "lint": "biome check .",
     "format": "biome check --write --unsafe .",
     "typecheck": "tsc --noEmit",

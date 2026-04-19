@@ -11,6 +11,7 @@ Internal CLIs and gate machinery. **Nothing here ships to production** — this 
 | `src/gate/` | Gate runner — orchestrates typecheck/lint/test/code-health as subprocesses and prints results |
 | `src/gate.ts` | Tiny CLI entry for `bun run gate` |
 | `src/code-health.ts` | Per-file Code Health CLI used by the pre-commit hook. Shares parsing + dispatch logic with the gate via `gate/checks.ts` — they're two front-ends over the same pure `parseCodeHealthOutput` + `checkFileHealth` helpers. |
+| `src/install-mcp.ts` | `bun run install:mcp:local` — patches `~/Library/Application Support/Claude/claude_desktop_config.json` with the `gc-erp-local` MCP server entry. Resolves Homebrew's `npx` (Node ≥18) to sidestep Claude Desktop's stale launch-services PATH (see [docs/guides/dogfood.md §Node version caveat]). Pure helpers (`buildLocalEntry`, `patchConfig`, `removeServer`) tested in `install-mcp.test.ts`; the file is excluded from coverage as a whole because the orchestration is filesystem I/O. |
 | `src/*.test.ts` | Vitest suites (coverage-enforced on pure logic only) |
 
 ## When to touch this package
