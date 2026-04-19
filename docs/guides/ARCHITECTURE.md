@@ -62,7 +62,7 @@ Turbo-managed bun workspace. Four packages at v1:
 │   │   └── CLAUDE.md
 │   ├── product/                     # goal, scope, milestones, backlog
 │   ├── decisions/                   # architecture decision records (template + seeded)
-│   └── retros/                      # retro logs (daily-ish; append-only)
+│   └── retros/                      # draft.md queue + dated retros (Max-initiated)
 ├── biome.json                       # lint + format (single tool)
 ├── bunfig.toml                      # exact versions, text lockfile, 7-day release age
 ├── commitlint.config.ts             # conventional commits (standard types only)

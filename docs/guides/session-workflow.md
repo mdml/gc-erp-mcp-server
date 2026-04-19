@@ -40,8 +40,8 @@ Commit messages are conventional-commit. Cadence varies — the test is "does th
 ## End of session
 
 1. **Update `now.md`.** Cross off completed items; cap "Recently done" at ~3 (prune older ones out — it's not a log).
-2. **Log a [retro](../retros/CLAUDE.md)** if the session made a meaningful change (ADR, schema shift, doc restructure, hard debug). Not every session needs one.
-3. **Commit.** The retro is part of the session's commit, not a separate one.
+2. **Log retro-worthy signal to [`draft.md`](../retros/draft.md).** One-liner per observation — anything rough, surprising, or worth remembering. Do **not** write a dated retro unless Max has explicitly initiated one; `draft.md` is the queue that Max pulls from when he decides to run a retro. See [retros/CLAUDE.md](../retros/CLAUDE.md) for the full two-fold pattern.
+3. **Commit.** Any `draft.md` updates are part of the session's commit, not a separate one.
 4. **Push.** Solo mode: push the feature branch. Worktree mode: the parallel agent opens or updates a PR back to the feature branch.
 5. **Feature → `main` via PR, rebase-merged.** Branch protection enforces PR-only + linear history + rebase-merge; direct pushes, merge commits, and squash-merges are all rejected. Use `gh pr merge <n> --rebase --delete-branch`. Merging to `main` is a deliberate act done when the whole feature is done — not a session boundary. If a PR genuinely needs squashing (rare), flag it for Max to temporarily unlock the rule.
 
