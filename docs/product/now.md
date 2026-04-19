@@ -6,7 +6,8 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Up next
 
-*(nothing — `feat/dogfood-prep → main` is the next action; M3 sequencing decided at next session start.)*
+1. **OAuth migration to Stytch ([ADR 0010](../decisions/0010-stytch-oauth-for-prod-mcp.md)) — blocks claude.ai dogfood.** Scenario-runner prod smoke is green over bearer, but claude.ai web + iOS + Android Custom Connectors reject static bearer headers — they require OAuth 2.1 + DCR. Coding slice: add the `stytch` SDK + secrets (`STYTCH_PROJECT_ID`, `STYTCH_SECRET`) via `secrets.config.ts` and `turbo.json globalPassThroughEnv`; wrap `/mcp*` with Stytch JWT validation in prod (bearer stays for local, gated on `env.STYTCH_PROJECT_ID` absence); expose `/.well-known/oauth-authorization-server` + `/authorize` routes per Stytch's Cloudflare template; update `handler.test.ts` and the `install:mcp:prod` block to drop `Authorization: Bearer …`. See ADR 0010 §"Implementation notes" for the open verification items (streamable HTTP vs SSE, plain-fetch vs Hono).
+2. **Merge `feat/dogfood-prep → main`** after the Stytch slice lands and claude.ai connects end-to-end. M3 sequencing decided at the next session start.
 
 ## In flight
 

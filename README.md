@@ -8,7 +8,7 @@ See [SPEC.md](./SPEC.md) for the data model, a narrative walkthrough, and open q
 
 - **Runtime:** Cloudflare Workers (remote HTTP, reachable from phones).
 - **MCP transport:** streamable HTTP via Cloudflare's [`agents`](https://developers.cloudflare.com/agents/) `McpAgent` (each session backed by a Durable Object).
-- **Auth:** bearer token. Shared between Max + Salman via 1Password.
+- **Auth:** OAuth 2.1 + DCR via [Stytch Connected Apps](https://stytch.com/docs/guides/connected-apps/mcp-servers) in prod (see [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md)); static bearer token in local dev.
 - **Tools (v0.0.1):** `ping`, `list_jobs` (returns `[]`).
 
 ## Layout
@@ -65,7 +65,7 @@ turbo run sync-secrets       # team secrets (required) + developer secrets (best
 direnv allow                 # one-time; direnv will now auto-load on cd
 ```
 
-After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MCP_BEARER_TOKEN`, plus any developer secrets you provided refs for. Rotate by re-running `turbo run sync-secrets` + `direnv reload`.
+After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MCP_BEARER_TOKEN` (local-only fixture; prod uses OAuth per [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md)), `STYTCH_PROJECT_ID`, `STYTCH_SECRET`, plus any developer secrets you provided refs for. Rotate by re-running `turbo run sync-secrets` + `direnv reload`.
 
 ## Local dev
 
@@ -95,17 +95,18 @@ turbo run deploy
 
 Serves at `https://gc.leiserson.me`; the MCP path is `/mcp`. The `*.workers.dev` fallback is disabled in `wrangler.jsonc` so there's a single canonical hostname.
 
-**One-time per environment**: the bearer value lives in 1Password and needs to be uploaded as a Cloudflare secret so the deployed Worker can authenticate requests. Do this once (and whenever the bearer rotates):
+**One-time per environment**: the Stytch OAuth credentials live in 1Password and need to be uploaded as Cloudflare secrets so the deployed Worker can validate incoming JWTs. Do this once (and whenever they rotate):
 
 ```bash
-(cd packages/mcp-server && op read "op://gc-erp/mcp-bearer/credential" | bunx wrangler secret put MCP_BEARER_TOKEN)
+(cd packages/mcp-server && op read "op://gc-erp/stytch-project-id/credential" | bunx wrangler secret put STYTCH_PROJECT_ID)
+(cd packages/mcp-server && op read "op://gc-erp/stytch-secret/credential"     | bunx wrangler secret put STYTCH_SECRET)
 ```
 
-Piping direct from `op read` keeps the value out of shell history and off disk. This is the intentional out-of-band step — not automated in v1.
+Piping direct from `op read` keeps the values out of shell history and off disk. This is the intentional out-of-band step — not automated in v1. No `MCP_BEARER_TOKEN` is uploaded to prod; the bearer path only runs under `wrangler dev`.
 
 ## Connect from a client
 
-Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`, with `Authorization: Bearer <token>` as the auth header. Exact steps depend on the client (Claude Desktop, Claude web, Claude mobile). Once connected, `ping` and `list_jobs` show up in the tool list.
+Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`. In **Claude Desktop** and **claude.ai** (web + iOS + Android), you connect by URL only — no header to paste. On first connection each client walks through the OAuth consent flow (magic-link sign-in via email, backed by Stytch). See [`docs/guides/dogfood.md`](docs/guides/dogfood.md) for the full per-client setup, and [ADR 0010](docs/decisions/0010-stytch-oauth-for-prod-mcp.md) for why static bearer headers don't work with claude.ai.
 
 ## Scripts (root)
 
