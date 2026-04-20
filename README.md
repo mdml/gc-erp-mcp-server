@@ -108,10 +108,10 @@ Piping direct from `op read` keeps the values out of shell history and off disk.
 
 Add a custom connector / remote MCP server pointing at `https://gc.leiserson.me/mcp`. The client shape differs by platform:
 
-- **claude.ai (web + iOS + Android):** paste the URL into Settings → Connectors → Add custom connector. Auth field stays blank — claude.ai speaks MCP OAuth + DCR natively.
-- **Claude Desktop (Mac):** Desktop's config file is stdio-only, so it connects via the `mcp-remote` bridge (which itself speaks the MCP OAuth flow). `bun run install:mcp:prod` prints the exact JSON block.
+- **claude.ai (web + iOS + Android):** paste the URL into Settings → Connectors → Add custom connector. Auth field stays blank — claude.ai speaks MCP OAuth + DCR natively. **This is the verified dogfood path.**
+- **Claude Desktop (Mac):** *Unverified end-to-end.* Desktop's config file is stdio-only, so it connects via the `mcp-remote` bridge (which itself speaks the MCP OAuth flow). `bun run install:mcp:prod` prints a JSON block to paste. The path wasn't smoke-tested for the M2 merge (claude.ai was the critical path); first use should expect to debug — see [`docs/guides/dogfood.md` §`install:mcp:prod`](docs/guides/dogfood.md#installmcpprod--prints-the-connection-guide).
 
-Either way, the first connection pops a browser for Clerk's hosted consent page: sign in (or sign up) with whatever method you enabled on the Clerk instance, approve the scopes. See [`docs/guides/dogfood.md`](docs/guides/dogfood.md) for the full per-client setup, and [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) for why static bearer headers don't work with claude.ai and why Clerk hosts the consent UI end-to-end.
+For claude.ai the first connection pops a browser for Clerk's hosted consent page: sign in (or sign up) with whatever method you enabled on the Clerk instance, approve the scopes. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) for why static bearer headers don't work with claude.ai and why Clerk hosts the consent UI end-to-end.
 
 ## Scripts (root)
 
