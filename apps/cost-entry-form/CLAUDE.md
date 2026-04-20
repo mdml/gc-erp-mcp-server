@@ -1,6 +1,6 @@
 # CLAUDE.md — apps/cost-entry-form
 
-The first MCP app — a pre-filled cost-entry form that Claude renders inline via [`@modelcontextprotocol/ext-apps`](../../docs/decisions/0014-mcp-apps-sdk.md). Builds to a single-file HTML artifact (`dist/cost-entry-form.html`) that `apps/mcp-server` inlines at build time and serves over `resources/read` at `ui://cost-entry/form.html`.
+The first MCP app — a pre-filled cost-entry form that Claude renders inline via [`@modelcontextprotocol/ext-apps`](../../docs/decisions/0014-mcp-apps-sdk.md). Builds to a single-file HTML artifact (`dist/cost-entry-form.html`) that `apps/mcp-server` inlines at build time and serves over `resources/read` at `ui://cost-entry-form/view.html`.
 
 ## What's here
 
