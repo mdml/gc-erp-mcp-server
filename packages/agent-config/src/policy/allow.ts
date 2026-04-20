@@ -149,6 +149,7 @@ export const bashAllow: readonly string[] = [
   // Data inspection on stdout / files.
   "Bash(jq *)",
   "Bash(yq *)",
+  "Bash(diff *)",
 ];
 
 export const mcpAllow: readonly string[] = [

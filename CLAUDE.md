@@ -51,6 +51,7 @@ These forms run without a permission prompt (policy lives in [packages/agent-con
 | `git push origin <prefix>/*` | `git push origin slice/3-infra`, `git push -u origin feat/foo` | Conventional-commit prefixes only. Bare `git push` and pushes to `main` stay ASK. |
 | `gh pr view/create/comment/edit/ready` | `gh pr create --title …`, `gh pr view 42` | Full list in `allow.ts`. |
 | `mkdir -p …` | `mkdir -p packages/database/src/schema` | Scaffolding dirs. Empty-dir creation is reversible; `rm -rf` stays deny. |
+| `diff …` | `diff .scratch/pr35.diff .scratch/pr35-v2.diff` | Read-only compare. Pair with `.scratch/` paths, not `/tmp/` — see [Agent conventions](#agent-conventions). |
 
 What **never** auto-runs (by deny):
 
