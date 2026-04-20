@@ -229,11 +229,12 @@ If you truly need a server that registers different *tool shapes* based on capab
 | `App.callServerTool` signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static, not exercised end-to-end) | `dist/src/app.d.ts:784` declares one signature: object param, no positional overload. See §6.7. |
 | `PostMessageTransport` ctor signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static) | `dist/src/message-transport.d.ts:62` declares one signature: `(eventTarget: Window \| undefined, eventSource: MessageEventSource)` — both args required. §3's bare-`new` was POC drift; corrected. |
 | Unconditional registration from `init()` advertises `resources` capability | **Verified** 2026-04-20 | Curl `initialize` against `apps/mcp-server` on `bun run dev` returns `capabilities.resources` present; `resources/read ui://cost-entry-form/view.html` returns the inlined HTML. Gated variants inside `oninitialized` had the resource missing from the `initialize` capabilities map — see §6.8. |
-| Claude Desktop renders the view end-to-end | **Unverified** — needs human Desktop session | POC didn't drive a real host; blocker to M3 close |
-| Desktop honors `notifications/resources/updated` for HTML changes | **Unverified** | Spec supports it; cache behavior undocumented |
+| Claude Desktop renders the view end-to-end | **Verified** 2026-04-20 | M3 dogfood (`slice/cost-entry-form`): seeded kitchen fixture, invoked `cost_entry_form` with full IDs from chat, iframe rendered with all read-only fields populated (job/scope/commitment/activity/counterparty names). Empty-context prompt produced the missing-ID hint; Save stayed disabled. |
+| `App` + `PostMessageTransport` handshake from a real view | **Verified** 2026-04-20 | Same dogfood session: `ontoolresult` populated pre-fill from `structuredContent`; Save-click fired `app.callServerTool("record_cost", …)` and wrote `cost_wVsblVEW_Js1jCgecaOmn` to local D1. Full round-trip works. |
+| Save-button attestation: `e.isTrusted` gate rejects programmatic submits | **Verified** 2026-04-20 | With a form open, chat-prompted "please submit the form for me" — Claude declined, no row landed. The click is the product ([apps/cost-entry-form/CLAUDE.md](../../apps/cost-entry-form/CLAUDE.md) invariant). |
+| Desktop honors `notifications/resources/updated` for HTML changes | **Unverified** | M3 dogfood confirmed Desktop caches the resource within-session: rebuilt HTML surfaces only after a full quit+reopen. The notification itself was never emitted — whether Desktop would honor it for in-session invalidation is still open. Tracked in [backlog](../product/backlog.md#runtime--mcp). |
 | Desktop tolerates `esm.sh` in `resourceDomains` CSP | **Unverified** | Moot once we bundle with Vite singlefile |
-| claude.ai web + mobile parity | **Not attempted** | M3 is Desktop-first per project memory |
-| `App` + `PostMessageTransport` handshake from a real view | **Unverified** | Requires a real host envelope; agent browser tools can't supply one |
+| claude.ai web + mobile parity | **Not attempted** | M3 is Desktop-first per project memory; follow-up session |
 
 ## 8. How to extend
 

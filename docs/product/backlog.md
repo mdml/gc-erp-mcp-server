@@ -38,6 +38,7 @@ Unresolved questions. When a question resolves, it either becomes an ADR (`docs/
 - [x] ~~Where does the server run long-term? Local process (`npx`), hosted, or both? Affects auth and multi-device story.~~ *Resolved: hosted on Cloudflare at `gc.leiserson.me` ([ADR 0002](../decisions/0002-infra-cli.md)); prod auth is Clerk OAuth ([ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), local stays on a static bearer for scenario-runner simplicity.*
 - [ ] **Which MCP app ships first.** Leaning: cost-entry form at M3, job dashboard at M4, pay app generator at M5. See [milestones.md](milestones.md).
 - [ ] **How Claude picks an app.** Return type? Explicit hints? Re-read the MCP Apps extension spec before M3.
+- [ ] **Desktop in-session resource cache invalidation.** M3 dogfood (2026-04-20) found Claude Desktop caches `resources/read` responses for the lifetime of a session: a rebuilt view HTML surfaces in the iframe only after a full Desktop quit+reopen. Unknowns: (a) does Desktop honor `notifications/resources/updated` if the server emits it? (not tested — server currently never emits); (b) is there a clean dev-time hook to wire the emit on HTML change? Investigation: emit the notification from a dev-only Worker path when the view bundle changes, see whether Desktop picks it up without restart. Not a blocker for M3 ship; surfaces as friction on first M4/M5 iteration. See [mcp-apps.md §7](../guides/mcp-apps.md#7-verified-vs-unverified).
 
 ## Project ↔ job
 
