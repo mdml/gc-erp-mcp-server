@@ -36,6 +36,12 @@ export type CostSource =
 // Pre-fill context from the server's tool result.
 // ---------------------------------------------------------------------------
 
+// activationId is not on this shape yet: the server-side CostEntryFormInput
+// (apps/mcp-server/src/tools/cost_entry_form.resolver.ts) neither accepts it
+// as input nor echoes it in structuredContent. Add it here and in the
+// submission builder in the same PR that extends the server to resolve an
+// activation; wiring one side without the other is the exact drift CLAUDE.md
+// warns against.
 export interface PrefillContext {
   jobId?: string;
   jobName?: string;
@@ -47,7 +53,6 @@ export interface PrefillContext {
   activityName?: string;
   counterpartyId?: string;
   counterpartyName?: string;
-  activationId?: string;
   amountCents?: number;
   incurredOn?: string;
   memo?: string;
@@ -223,7 +228,6 @@ export interface RecordCostArguments {
   amount: { cents: number; currency: "USD" };
   incurredOn: string;
   source: CostSource;
-  activationId?: string;
   memo?: string;
 }
 
@@ -250,7 +254,6 @@ export function buildRecordCostArguments(
     incurredOn: state.incurredOn,
     source: state.source,
   };
-  if (p.activationId !== undefined) args.activationId = p.activationId;
   const memo = state.memo.trim();
   if (memo.length > 0) args.memo = memo;
   return args;
