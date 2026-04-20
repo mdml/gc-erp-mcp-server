@@ -49,7 +49,7 @@ export function formatContextSummary(ctx: CostEntryFormContext): string {
   if (ctx.counterpartyName !== undefined)
     parts.push(`counterparty "${ctx.counterpartyName}"`);
   if (ctx.amount !== undefined)
-    parts.push(`amount ${ctx.amount.cents} ${ctx.amount.currency}`);
+    parts.push(`amount ${ctx.amount.cents} cents ${ctx.amount.currency}`);
   if (ctx.incurredOn !== undefined) parts.push(`incurredOn ${ctx.incurredOn}`);
   if (ctx.memo !== undefined) parts.push(`memo "${ctx.memo}"`);
   return `Cost-entry context resolved: ${parts.join(", ")}.`;
