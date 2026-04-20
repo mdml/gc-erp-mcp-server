@@ -167,4 +167,15 @@ export const mcpAllow: readonly string[] = [
   "mcp__codescene__analyze_change_set",
   "mcp__codescene__pre_commit_code_health_safeguard",
   "mcp__codescene__code_health_refactoring_business_case",
+
+  // Playwright MCP — read-only observation of an already-open page.
+  // Interaction + navigation tools (click, type, navigate, evaluate) stay ASK
+  // so an agent can't silently steer the browser at sensitive URLs or read
+  // DOM/localStorage/cookies without a prompt.
+  "mcp__plugin_playwright_playwright__browser_snapshot",
+  "mcp__plugin_playwright_playwright__browser_console_messages",
+  "mcp__plugin_playwright_playwright__browser_take_screenshot",
+  "mcp__plugin_playwright_playwright__browser_close",
+  "mcp__plugin_playwright_playwright__browser_wait_for",
+  "mcp__plugin_playwright_playwright__browser_resize",
 ];

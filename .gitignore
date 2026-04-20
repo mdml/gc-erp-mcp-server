@@ -23,6 +23,9 @@ node_modules/
 dist/
 coverage/
 
+# Tool artifacts (Playwright MCP browser sessions)
+.playwright-mcp/
+
 # OS
 .DS_Store
 
