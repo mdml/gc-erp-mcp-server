@@ -164,33 +164,11 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 ### `install:mcp:prod` — prints the connection guide
 
-Prod uses OAuth (see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)), but Claude Desktop's `claude_desktop_config.json` is stdio-only — the same platform constraint that forces the `install:mcp:local` entry above through the `mcp-remote` bridge (the "Why `mcp-remote` and not `type: "http"`?" callout under install:mcp:local has the rationale). What's different for prod is that `mcp-remote` speaks the full MCP OAuth flow natively: it fetches our `/.well-known/oauth-authorization-server` on first run, performs Dynamic Client Registration, pops the system browser for Clerk's hosted consent page, caches the access token under `~/.mcp-auth/`, and refreshes on expiry. So the prod entry needs no `--header`, no `AUTH_HEADER`, no bearer — `mcp-remote` handles authentication end-to-end.
+> **Status: not end-to-end verified.** The Desktop → prod path (`mcp-remote` → Clerk OAuth → tool call) was not exercised during the M2-to-main smoke, because claude.ai web is the critical dogfood path and Desktop-prod is a bonus. The `install:mcp:prod` command still prints a valid-looking Clerk-shaped config block, but the first person to actually use it should expect to debug. Either verify it and delete this callout, or drop Desktop-prod from `install-mcp/patch.ts` entirely.
 
-```
-bun run install:mcp:prod
-```
+`bun run install:mcp:prod` prints a JSON block to paste into `~/Library/Application Support/Claude/claude_desktop_config.json`. See [README §Connect from a client](../../README.md#connect-from-a-client) for the user-facing summary. The block uses `mcp-remote` (same stdio bridge as `install:mcp:local`) because Claude Desktop's config file is stdio-only; `mcp-remote` fetches `/.well-known/oauth-authorization-server`, performs DCR against Clerk, pops a browser for Clerk's hosted consent page, and caches the token under `~/.mcp-auth/`.
 
-The output prints this JSON block for `~/Library/Application Support/Claude/claude_desktop_config.json` (alongside any `gc-erp-local` entry):
-
-```json
-{
-  "mcpServers": {
-    "gc-erp-prod": {
-      "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "mcp-remote", "https://gc.leiserson.me/mcp"],
-      "env": { "PATH": "/opt/homebrew/bin:/usr/bin:/bin" }
-    }
-  }
-}
-```
-
-Paste it in and restart Claude Desktop. On first connection `mcp-remote` pops a browser window to Clerk's hosted consent page; sign in (or sign up) with whatever method you've enabled on the Clerk instance, approve the scopes. From then on Desktop talks to `mcp-remote`'s stdio proxy, which talks to `https://gc.leiserson.me/mcp` over HTTPS with a Clerk-issued access token; the token is refreshed automatically on expiration.
-
-The absolute-path `command` + pinned `PATH` env is the same Node-version caveat `install:mcp:local` carries — `mcp-remote` runs under Desktop's launch-services `PATH`, which may not include your shell's `nvm`/Homebrew bin directory.
-
-Smoke-test in a fresh conversation: "list my jobs" → should call `list_jobs` and return an empty array (or seeded projects if any exist).
-
-**If the consent flow fails**, check: (a) `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON (proxied from Clerk's FAPI), (b) your Clerk instance has Dynamic Client Registration toggled on in the OAuth applications dashboard, (c) `npx` resolves via the absolute path in the config (run `which npx` — it should match).
+Gotchas to watch for when/if we verify this path: (a) Desktop's launch-services `PATH` may not include your shell's `nvm`/Homebrew bin — the emitted config pins absolute `/opt/homebrew/bin/npx`, verify that matches your machine; (b) if the consent flow fails, check that `https://gc.leiserson.me/.well-known/oauth-authorization-server` returns valid JSON and that DCR is toggled on in Clerk's OAuth-applications dashboard.
 
 ## Claude.ai Connectors (mobile / web)
 
@@ -229,9 +207,16 @@ Run these in order. Each is independently safe to retry.
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
 3. Verify Clerk OAuth secrets + instance config are in place (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)):
-   - `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` uploaded via `wrangler secret put …`;
+   - Upload the Clerk secrets via `wrangler secret put` — run from inside `packages/mcp-server/` (wrangler reads `wrangler.jsonc` from the cwd):
+     ```bash
+     (cd packages/mcp-server && bunx wrangler secret put CLERK_SECRET_KEY)
+     (cd packages/mcp-server && bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
+     ```
+     `wrangler` prompts for the value on stdin; paste the Clerk-issued key. **Do not** use `--var KEY=VAL` — wrangler 4.x parses values into argv, so the secret ends up in shell history / process listings / error output. Past incident (PR #29): `CLERK_SECRET_KEY` leaked to stdout via a malformed `--var` invocation and had to be rotated.
    - Clerk dashboard → OAuth applications → **Dynamic Client Registration toggled on** (so claude.ai can self-register);
    - No `MCP_BEARER_TOKEN` in prod Cloudflare secrets.
+
+   > **Slices that change the names of prod secrets must copy the two `(cd packages/mcp-server && bunx wrangler secret put …)` lines above verbatim** — don't rewrite them from memory. The subshell pattern is load-bearing (wrangler needs the Worker's cwd to find `wrangler.jsonc`), and agent training data sometimes suggests repo-root invocations that fail with "Required Worker name missing." Verbatim-copy is the fix.
 4. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
 5. Verify the seed:
    ```bash

@@ -53,10 +53,21 @@ When you launch parallel agents via `claude --worktree`, three details matter:
 - **Anticipate conflicts before launching.** Before the agents start, eyeball which files both worktrees will touch and brief each with "if you touch file F, take approach X; the other worktree will take approach Y." That 30 seconds of foresight turns rebase resolution into mechanical work instead of a call back to Max at merge time.
 - **Force-pushing a rebased branch is human-only.** Policy denies `git push --force*` including `--force-with-lease` (see root [CLAUDE.md](../../CLAUDE.md) auto-allow table). Agents rebase locally, verify with `bun run gate`, then ask the human to run `! git push --force-with-lease origin <branch>`. The `!` prefix runs in-session so output lands in the conversation — no round-trip.
 
+## Working with a new vendor
+
+Any time a session is about to build against a vendor SDK / auth flow / API we haven't used in this repo before, the first step is **not** an ADR or a slice plan — it's a disposable POC plus a short vendor guide.
+
+1. **30–60 min POC.** Scratch Worker, scratch script, whatever's smallest. Goal: produce the minimal working request/response that proves our assumptions about the vendor are correct. Read the vendor's *current* docs — assume training data is stale.
+2. **Write [`docs/guides/<vendor>.md`](./) capturing what actually works.** What the POC confirmed, what the vendor's docs got wrong, the minimal working shape, any gotchas. The guide is the POC's deliverable — without it the POC's learnings evaporate.
+3. **Then the ADR + slice.** Both cite the vendor guide rather than re-deriving.
+
+Why this shape: we've hit this failure mode twice recently — Stytch false-start (half-day lost to a slice plan built on assumed behavior — see [retro](../retros/2026-04-19-stytch-path-a-false-start.md)); `type: "http"` Claude Desktop claim in `dogfood.md` that wasn't actually supported. Requiring a vendor guide is a deliberate forcing function: you can't skip the POC if you owe the guide. This is the same pattern codified in root [CLAUDE.md](../../CLAUDE.md) §Agent Conventions.
+
 ## What tends to go wrong
 
 - **Code-vs-docs drift discovered mid-session.** Stop. Update `now.md` and any affected guide before continuing. *This is the #1 friction in this repo* — the orientation phase exists to catch it before acting.
 - **Parallel worktrees colliding.** Aim for non-overlapping file scopes per worktree. If PRs to the feature branch collide, resolve linearly — merge one, rebase the other — rather than trying to merge both at once.
+- **Building against assumed vendor behavior.** If you can't point to a POC-generated vendor guide, you're guessing. See "Working with a new vendor" above.
 
 ## Relation to other docs
 
