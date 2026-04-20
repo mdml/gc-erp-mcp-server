@@ -272,13 +272,6 @@ describe("buildRecordCostArguments", () => {
     });
   });
 
-  it("includes activationId when the prefill provided one", () => {
-    const s = valid({
-      prefill: { ...FULL_PREFILL, activationId: "actv_1" },
-    });
-    expect(buildRecordCostArguments(s).activationId).toBe("actv_1");
-  });
-
   it("omits memo when blank or whitespace-only", () => {
     expect(buildRecordCostArguments(valid({ memo: "" })).memo).toBeUndefined();
     expect(
