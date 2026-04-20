@@ -212,29 +212,38 @@ async function resolveCommitmentLabel(
 // Assemble output from the (already-validated) rows + pass-through scalars.
 // ---------------------------------------------------------------------------
 
-interface PairSpec {
-  row: { id: unknown } | undefined;
-  idKey: string;
-  labelKey: string;
-  labelValue: unknown;
+function applyRowLabels(
+  out: CostEntryFormContext,
+  rows: FetchedRows,
+  commitmentLabel: string | undefined,
+): void {
+  if (rows.scope) {
+    out.scopeId = rows.scope.id;
+    out.scopeName = rows.scope.name;
+  }
+  // Caller invariant: if rows.commitment is set, commitmentLabel is set too
+  // (resolveCommitmentLabel is awaited only when rows.commitment exists).
+  if (rows.commitment) {
+    out.commitmentId = rows.commitment.id;
+    out.commitmentLabel = commitmentLabel;
+  }
+  if (rows.activity) {
+    out.activityId = rows.activity.id;
+    out.activityName = rows.activity.name;
+  }
+  if (rows.party) {
+    out.counterpartyId = rows.party.id;
+    out.counterpartyName = rows.party.name;
+  }
 }
 
-function mergePair(out: Record<string, unknown>, p: PairSpec): void {
-  if (p.row === undefined) return;
-  out[p.idKey] = p.row.id;
-  out[p.labelKey] = p.labelValue;
-}
-
-function mergeScalars(
-  out: Record<string, unknown>,
+function applyInputScalars(
+  out: CostEntryFormContext,
   input: CostEntryFormInput,
 ): void {
-  const scalars: Array<[string, unknown]> = [
-    ["amount", input.amount],
-    ["incurredOn", input.incurredOn],
-    ["memo", input.memo],
-  ];
-  for (const [k, v] of scalars) if (v !== undefined) out[k] = v;
+  if (input.amount !== undefined) out.amount = input.amount;
+  if (input.incurredOn !== undefined) out.incurredOn = input.incurredOn;
+  if (input.memo !== undefined) out.memo = input.memo;
 }
 
 function buildContext(
@@ -242,35 +251,14 @@ function buildContext(
   input: CostEntryFormInput,
   commitmentLabel: string | undefined,
 ): CostEntryFormContext {
-  const job = rows.job;
-  if (!job) throw new Error("unreachable: job asserted present");
-  const out: Record<string, unknown> = { jobId: job.id, jobName: job.name };
-  mergePair(out, {
-    row: rows.scope,
-    idKey: "scopeId",
-    labelKey: "scopeName",
-    labelValue: rows.scope?.name,
-  });
-  mergePair(out, {
-    row: rows.commitment,
-    idKey: "commitmentId",
-    labelKey: "commitmentLabel",
-    labelValue: commitmentLabel,
-  });
-  mergePair(out, {
-    row: rows.activity,
-    idKey: "activityId",
-    labelKey: "activityName",
-    labelValue: rows.activity?.name,
-  });
-  mergePair(out, {
-    row: rows.party,
-    idKey: "counterpartyId",
-    labelKey: "counterpartyName",
-    labelValue: rows.party?.name,
-  });
-  mergeScalars(out, input);
-  return out as unknown as CostEntryFormContext;
+  if (!rows.job) throw new Error("unreachable: job asserted present");
+  const out: CostEntryFormContext = {
+    jobId: rows.job.id,
+    jobName: rows.job.name,
+  };
+  applyRowLabels(out, rows, commitmentLabel);
+  applyInputScalars(out, input);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
