@@ -19,4 +19,7 @@ minimumReleaseAgeExcludes = [
   "@clerk/shared",
   "agents",
   "wrangler",
+  # ext-apps 1.6.0 published 2026-04-14; inside the 7-day quarantine until
+  # 2026-04-21. Per ADR 0014. Remove this entry on/after 2026-04-21.
+  "@modelcontextprotocol/ext-apps",
 ]
