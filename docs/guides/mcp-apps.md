@@ -102,13 +102,15 @@ The view is one HTML file containing a JS module that constructs an `App`, regis
   app.ontoolresult = (r) => console.log("tool-result", r);  // CallToolResult
   app.onhostcontextchanged = (ctx) => { /* theme/locale/platform */ };
   app.onteardown = async () => ({});
-  await app.connect(new PostMessageTransport());
+  await app.connect(new PostMessageTransport(window.parent, window.parent));
   f.addEventListener("submit", async (e) => {
     e.preventDefault();
     await app.callServerTool({ name: "record_hello", arguments: { name: name.value } });
   });
 </script></body></html>
 ```
+
+> **`PostMessageTransport` signature — vendor-guide drift caught during M3.** The 1.6.0 `.d.ts` (`dist/src/message-transport.d.ts:62`) declares one signature: `constructor(eventTarget: Window | undefined, eventSource: MessageEventSource)` — both args required. The earlier POC session in this guide wrote `new PostMessageTransport()` with zero args; that compiles only if you ignore the type error (or predates 1.6.0). For a view, pass `window.parent` as both arguments, per the SDK's own `message-transport.examples.ts`. Captured while scaffolding `apps/cost-entry-form/` (see the workspace CLAUDE.md invariant).
 
 **Production slice:** bundle the view with Vite + [`vite-plugin-singlefile`](https://github.com/richardtallent/vite-plugin-singlefile) so the SDK code is inlined (no esm.sh at runtime → no extra CSP domain). Spike 0001 §8b has the Vite config.
 
@@ -211,6 +213,7 @@ Our first POC cut called `getUiCapability(server.server.getClientCapabilities())
 | `tools/call` on a plain tool (submission path) works in-session | **Verified** 2026-04-20 | live curl against POC `/mcp` |
 | Server-side dev loop: edit HTML → reload → new `resources/read` | **Verified** 2026-04-20 | bumped a version marker, re-fetched on same session |
 | `App.callServerTool` signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static, not exercised end-to-end) | `dist/src/app.d.ts:784` declares one signature: object param, no positional overload. See §6.7. |
+| `PostMessageTransport` ctor signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static) | `dist/src/message-transport.d.ts:62` declares one signature: `(eventTarget: Window \| undefined, eventSource: MessageEventSource)` — both args required. §3's bare-`new` was POC drift; corrected. |
 | Claude Desktop renders the view end-to-end | **Unverified** — needs human Desktop session | POC didn't drive a real host; blocker to M3 close |
 | Desktop honors `notifications/resources/updated` for HTML changes | **Unverified** | Spec supports it; cache behavior undocumented |
 | Desktop tolerates `esm.sh` in `resourceDomains` CSP | **Unverified** | Moot once we bundle with Vite singlefile |
