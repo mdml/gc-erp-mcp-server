@@ -13,7 +13,15 @@
 // ---------------------------------------------------------------------------
 // CostSource — mirrored from @gc-erp/database. Cross-workspace import would
 // pull server-side deps into the view bundle; this is a narrow structural
-// copy. If CostSource grows a variant, both sides update in the same PR.
+// copy. If CostSource grows a variant *that the form can produce*, both sides
+// update in the same PR.
+//
+// Intentionally omitted: the canonical CostSource in packages/database/src/
+// schema/costs.ts has `documentId?: DocumentId` on invoice/direct/tm. The
+// form doesn't wire an attachment picker in M3, so the field would be
+// dead weight on the view side; zod's `.optional()` keeps the submission
+// shape valid without it. When a future slice adds an attachment UI, update
+// this mirror and the form UI in the same PR.
 // ---------------------------------------------------------------------------
 
 export type CostSourceKind = "invoice" | "direct" | "tm" | "adjustment";
