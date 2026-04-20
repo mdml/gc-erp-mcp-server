@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { McpToolError } from "./_mcp-tool";
 import { createTestDb } from "./_test-db";
 import {
-  formatFallbackText,
+  formatContextSummary,
   runResolver,
   toErrorResult,
 } from "./cost_entry_form";
@@ -15,25 +15,18 @@ import type { CostEntryFormContext } from "./cost_entry_form.resolver";
 // it's workerd-only wiring that calls into McpAgent internals.
 
 // ---------------------------------------------------------------------------
-// formatFallbackText — branches on whether each paired field is present.
+// formatContextSummary — one-line summary returned in `content[0].text`.
+// UI hosts ignore it; text-only hosts surface it to the model.
 // ---------------------------------------------------------------------------
 
-describe("formatFallbackText", () => {
-  it("renders only the job header when no other fields are present", () => {
+describe("formatContextSummary", () => {
+  it("renders only the job clause when no other fields are present", () => {
     const ctx: CostEntryFormContext = {
       jobId: "job_t" as JobId,
       jobName: "Kitchen",
     };
-    const text = formatFallbackText(ctx);
-    expect(text).toContain('Cost-entry context resolved for job "Kitchen"');
-    expect(text).not.toContain("scope:");
-    expect(text).not.toContain("commitment:");
-    expect(text).not.toContain("activity:");
-    expect(text).not.toContain("counterparty:");
-    expect(text).not.toContain("amount:");
-    expect(text).not.toContain("incurredOn:");
-    expect(text).not.toContain("memo:");
-    expect(text).toContain("Call `record_cost`");
+    const text = formatContextSummary(ctx);
+    expect(text).toBe('Cost-entry context resolved: job "Kitchen" (job_t).');
   });
 
   it("renders every field when the context is fully resolved", () => {
@@ -52,14 +45,15 @@ describe("formatFallbackText", () => {
       incurredOn: "2026-05-04",
       memo: "deposit",
     };
-    const text = formatFallbackText(ctx);
-    expect(text).toContain("scope: Framing (scope_t)");
-    expect(text).toContain("commitment: Rogelio's Framing LLC (cm_t)");
-    expect(text).toContain("activity: Frame (act_t)");
-    expect(text).toContain("counterparty: Client (party_t)");
-    expect(text).toContain("amount: 12345 cents USD");
-    expect(text).toContain("incurredOn: 2026-05-04");
-    expect(text).toContain("memo: deposit");
+    const text = formatContextSummary(ctx);
+    expect(text).toContain('job "Kitchen" (job_t)');
+    expect(text).toContain('scope "Framing"');
+    expect(text).toContain('commitment "Rogelio\'s Framing LLC"');
+    expect(text).toContain('activity "Frame"');
+    expect(text).toContain('counterparty "Client"');
+    expect(text).toContain("amount 12345 USD");
+    expect(text).toContain("incurredOn 2026-05-04");
+    expect(text).toContain('memo "deposit"');
   });
 });
 

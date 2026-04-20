@@ -195,9 +195,23 @@ await app.callServerTool({ name: "record_hello", arguments: { name: "max" } });
 
 No overload accepts positional args — there's only the one method. When M3's slice calls `callServerTool` from the cost-entry view, use the object form.
 
-### 6.8 `getUiCapability` at server-init time returns undefined
+### 6.8 Don't gate resource registration on `getUiCapability` — register unconditionally from `init()`
 
-Our first POC cut called `getUiCapability(server.server.getClientCapabilities())` at construction time and always got `undefined` — because the server hasn't seen the client's `initialize` yet. For our progressive-enhancement pattern, the capability probe needs to run *inside* the `McpAgent.init()` callback after the first message, or be deferred to a per-request branch. Spike §8e's sketch is right in spirit but the exact call-site matters.
+Earlier drafts of this guide (and the SDK's own `index.d.ts` example for `getUiCapability`) show a progressive-enhancement pattern: defer the capability probe to `server.server.oninitialized`, then conditionally call `registerAppTool` + `registerAppResource` if `uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)`, else fall back to a plain tool. **That pattern works for tools but breaks for resources.** Don't use it — in our setting, call `registerAppTool` and `registerAppResource` synchronously from `McpAgent.init()` unconditionally.
+
+Why the `oninitialized` pattern is broken for resources, in our setting:
+
+- `oninitialized` fires *after* the server has already built its `initialize` response. By that point, the `capabilities` map in the response is frozen. A tool registered inside `oninitialized` still shows up later because the SDK sets `tools.listChanged: true` by default — late registrations push via `notifications/tools/list_changed`. **There is no analogous push for resources.** If `capabilities.resources` is absent from the `initialize` response, the host will never call `resources/read`, and the view resource is dead on arrival.
+- Caught in M3 dogfood (2026-04-20). Claude Desktop reported the `cost_entry_form` tool as "not available." Direct curl against `bun run dev`:
+  ```
+  initialize → "capabilities": {"tools": {"listChanged": true}}   # no resources key
+  resources/read ui://cost-entry-form/view.html → {"code":-32601,"message":"Method not found"}
+  ```
+- The text-only fallback never actually ran either (same latch), so our "progressive enhancement" was theater — only the app variant was ever wanted.
+
+**What to do instead:** call both `registerAppTool` and `registerAppResource` synchronously from `McpAgent.init()`. Non-UI hosts still call the tool and simply ignore `_meta.ui` on the result — return a useful `content[0].text` summary alongside `structuredContent` so text-only hosts can surface the resolved context to the model. No probe, no latch, no `oninitialized` assignment.
+
+If you truly need a server that registers different *tool shapes* based on capability (not just UI metadata), the `oninitialized` pattern for tools is fine. But for the app-tool + app-resource pair that MCP Apps prescribes, unconditional registration is correct.
 
 ## 7. Verified vs unverified
 
@@ -214,6 +228,7 @@ Our first POC cut called `getUiCapability(server.server.getClientCapabilities())
 | Server-side dev loop: edit HTML → reload → new `resources/read` | **Verified** 2026-04-20 | bumped a version marker, re-fetched on same session |
 | `App.callServerTool` signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static, not exercised end-to-end) | `dist/src/app.d.ts:784` declares one signature: object param, no positional overload. See §6.7. |
 | `PostMessageTransport` ctor signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static) | `dist/src/message-transport.d.ts:62` declares one signature: `(eventTarget: Window \| undefined, eventSource: MessageEventSource)` — both args required. §3's bare-`new` was POC drift; corrected. |
+| Unconditional registration from `init()` advertises `resources` capability | **Verified** 2026-04-20 | Curl `initialize` against `apps/mcp-server` on `bun run dev` returns `capabilities.resources` present; `resources/read ui://cost-entry-form/view.html` returns the inlined HTML. Gated variants inside `oninitialized` had the resource missing from the `initialize` capabilities map — see §6.8. |
 | Claude Desktop renders the view end-to-end | **Unverified** — needs human Desktop session | POC didn't drive a real host; blocker to M3 close |
 | Desktop honors `notifications/resources/updated` for HTML changes | **Unverified** | Spec supports it; cache behavior undocumented |
 | Desktop tolerates `esm.sh` in `resourceDomains` CSP | **Unverified** | Moot once we bundle with Vite singlefile |
@@ -226,7 +241,7 @@ When M3's `slice/cost-entry-form` starts, the concrete path is:
 
 1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `apps/mcp-server/package.json`. **Timebox the 7-day quarantine exception** per [spike 0001 §2](../spikes/0001-mcp-apps-sdk.md): the version clears the window on 2026-04-21, so the `minimumReleaseAgeExcludes` entry in [`bunfig.toml`](../../bunfig.toml) is only needed if the slice lands before then. Verify first with `bun pm view @modelcontextprotocol/ext-apps time`.
 2. Scaffold `apps/cost-entry-form/` per spike §8a. The `apps/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
-3. Gate registration on `getUiCapability()` — but call it *inside* `McpAgent.init()` (or per-request), not at class construction (see §6.8).
+3. Call `registerAppTool` + `registerAppResource` synchronously from `McpAgent.init()`. **Don't** gate on `getUiCapability()` — see §6.8 for the M3 incident that made the gated/`oninitialized` pattern load-bearing broken.
 4. Close the **unverified** rows in §7 during the first dogfood pass. Any row that stays unverified becomes a backlog entry before the slice merges.
 
 ---
