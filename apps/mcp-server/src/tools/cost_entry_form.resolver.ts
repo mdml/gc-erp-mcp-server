@@ -1,0 +1,308 @@
+/**
+ * cost_entry_form — label resolver.
+ *
+ * Pure function over a DatabaseClient: takes the (partial) pre-fill input the
+ * caller supplied and resolves display labels for each ID that's present.
+ * The `cost_entry_form` app tool calls this to build the `structuredContent`
+ * the view consumes; the text-only fallback tool uses the same resolved shape
+ * to format a suggestion for `record_cost`.
+ *
+ * Shape rules (per the slice spec):
+ *   - jobId is always provided → jobName is always in the output.
+ *   - Every other ID is optional → if the input omits it, the paired label is
+ *     omitted from the output. Don't fabricate labels for IDs the caller
+ *     didn't supply.
+ *   - Unknown IDs (queried but absent from D1) → throw McpToolError("not_found").
+ *
+ * Commitments carry no `name` column in SPEC §1, so the natural label is the
+ * commitment's counterparty's Party.name. That requires a second lookup
+ * after the commitment row comes back — kept separate from the batched
+ * initial fetch to keep the pure-function shape straightforward.
+ */
+
+import {
+  ActivityId,
+  activities,
+  CommitmentId,
+  commitments,
+  type DatabaseClient,
+  IsoDay,
+  JobId,
+  jobs,
+  Money,
+  PartyId,
+  parties,
+  ScopeId,
+  scopes,
+} from "@gc-erp/database";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { McpToolError } from "./_mcp-tool";
+
+// ---------------------------------------------------------------------------
+// Input schema — exported so the tool registration can feed it to
+// `registerAppTool`/`registerTool` as the tool's inputSchema.
+// ---------------------------------------------------------------------------
+
+export const CostEntryFormInput = z.object({
+  jobId: JobId,
+  scopeId: ScopeId.optional(),
+  commitmentId: CommitmentId.optional(),
+  activityId: ActivityId.optional(),
+  counterpartyId: PartyId.optional(),
+  amount: Money.optional(),
+  incurredOn: IsoDay.optional(),
+  memo: z.string().optional(),
+});
+export type CostEntryFormInput = z.output<typeof CostEntryFormInput>;
+
+// ---------------------------------------------------------------------------
+// Output shape — the resolved pre-fill context. Serialized as-is into the
+// app tool's `structuredContent`.
+// ---------------------------------------------------------------------------
+
+export interface CostEntryFormContext {
+  jobId: z.output<typeof JobId>;
+  jobName: string;
+  scopeId?: z.output<typeof ScopeId>;
+  scopeName?: string;
+  commitmentId?: z.output<typeof CommitmentId>;
+  commitmentLabel?: string;
+  activityId?: z.output<typeof ActivityId>;
+  activityName?: string;
+  counterpartyId?: z.output<typeof PartyId>;
+  counterpartyName?: string;
+  amount?: z.output<typeof Money>;
+  incurredOn?: z.output<typeof IsoDay>;
+  memo?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Batched initial fetch
+// ---------------------------------------------------------------------------
+
+interface FetchedRows {
+  job: { id: z.output<typeof JobId>; name: string } | undefined;
+  scope: { id: z.output<typeof ScopeId>; name: string } | undefined;
+  commitment:
+    | {
+        id: z.output<typeof CommitmentId>;
+        counterpartyId: z.output<typeof PartyId>;
+      }
+    | undefined;
+  activity: { id: z.output<typeof ActivityId>; name: string } | undefined;
+  party: { id: z.output<typeof PartyId>; name: string } | undefined;
+}
+
+function fetchRows(
+  db: DatabaseClient,
+  input: CostEntryFormInput,
+): Promise<FetchedRows> {
+  const scopeQ =
+    input.scopeId !== undefined
+      ? db
+          .select({ id: scopes.id, name: scopes.name })
+          .from(scopes)
+          .where(eq(scopes.id, input.scopeId))
+          .get()
+      : Promise.resolve(undefined);
+  const commitmentQ =
+    input.commitmentId !== undefined
+      ? db
+          .select({
+            id: commitments.id,
+            counterpartyId: commitments.counterpartyId,
+          })
+          .from(commitments)
+          .where(eq(commitments.id, input.commitmentId))
+          .get()
+      : Promise.resolve(undefined);
+  const activityQ =
+    input.activityId !== undefined
+      ? db
+          .select({ id: activities.id, name: activities.name })
+          .from(activities)
+          .where(eq(activities.id, input.activityId))
+          .get()
+      : Promise.resolve(undefined);
+  const partyQ =
+    input.counterpartyId !== undefined
+      ? db
+          .select({ id: parties.id, name: parties.name })
+          .from(parties)
+          .where(eq(parties.id, input.counterpartyId))
+          .get()
+      : Promise.resolve(undefined);
+
+  return Promise.all([
+    db
+      .select({ id: jobs.id, name: jobs.name })
+      .from(jobs)
+      .where(eq(jobs.id, input.jobId))
+      .get(),
+    scopeQ,
+    commitmentQ,
+    activityQ,
+    partyQ,
+  ]).then(([job, scope, commitment, activity, party]) => ({
+    job,
+    scope,
+    commitment,
+    activity,
+    party,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Found-row assertions — one call maps one potentially-missing row to a
+// `not_found` McpToolError with structured details.
+// ---------------------------------------------------------------------------
+
+function requireFound<T>(
+  row: T | undefined,
+  requestedId: string | undefined,
+  label: string,
+  detailsKey: string,
+): T | undefined {
+  if (requestedId === undefined) return undefined;
+  if (row === undefined) {
+    throw new McpToolError("not_found", `${label} not found: ${requestedId}`, {
+      [detailsKey]: requestedId,
+    });
+  }
+  return row;
+}
+
+function assertJobFound(
+  row: FetchedRows["job"],
+  jobId: z.output<typeof JobId>,
+): asserts row is NonNullable<FetchedRows["job"]> {
+  if (!row) {
+    throw new McpToolError("not_found", `job not found: ${jobId}`, { jobId });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// commitmentLabel ← Party.name(commitment.counterpartyId)
+// ---------------------------------------------------------------------------
+
+async function resolveCommitmentLabel(
+  db: DatabaseClient,
+  commitment: NonNullable<FetchedRows["commitment"]>,
+): Promise<string> {
+  const row = await db
+    .select({ name: parties.name })
+    .from(parties)
+    .where(eq(parties.id, commitment.counterpartyId))
+    .get();
+  if (!row) {
+    throw new McpToolError(
+      "not_found",
+      `commitment ${commitment.id} references missing counterparty ${commitment.counterpartyId}`,
+      {
+        commitmentId: commitment.id,
+        counterpartyId: commitment.counterpartyId,
+      },
+    );
+  }
+  return row.name;
+}
+
+// ---------------------------------------------------------------------------
+// Assemble output from the (already-validated) rows + pass-through scalars.
+// ---------------------------------------------------------------------------
+
+interface PairSpec {
+  row: { id: unknown } | undefined;
+  idKey: string;
+  labelKey: string;
+  labelValue: unknown;
+}
+
+function mergePair(out: Record<string, unknown>, p: PairSpec): void {
+  if (p.row === undefined) return;
+  out[p.idKey] = p.row.id;
+  out[p.labelKey] = p.labelValue;
+}
+
+function mergeScalars(
+  out: Record<string, unknown>,
+  input: CostEntryFormInput,
+): void {
+  const scalars: Array<[string, unknown]> = [
+    ["amount", input.amount],
+    ["incurredOn", input.incurredOn],
+    ["memo", input.memo],
+  ];
+  for (const [k, v] of scalars) if (v !== undefined) out[k] = v;
+}
+
+function buildContext(
+  rows: FetchedRows,
+  input: CostEntryFormInput,
+  commitmentLabel: string | undefined,
+): CostEntryFormContext {
+  const job = rows.job;
+  if (!job) throw new Error("unreachable: job asserted present");
+  const out: Record<string, unknown> = { jobId: job.id, jobName: job.name };
+  mergePair(out, {
+    row: rows.scope,
+    idKey: "scopeId",
+    labelKey: "scopeName",
+    labelValue: rows.scope?.name,
+  });
+  mergePair(out, {
+    row: rows.commitment,
+    idKey: "commitmentId",
+    labelKey: "commitmentLabel",
+    labelValue: commitmentLabel,
+  });
+  mergePair(out, {
+    row: rows.activity,
+    idKey: "activityId",
+    labelKey: "activityName",
+    labelValue: rows.activity?.name,
+  });
+  mergePair(out, {
+    row: rows.party,
+    idKey: "counterpartyId",
+    labelKey: "counterpartyName",
+    labelValue: rows.party?.name,
+  });
+  mergeScalars(out, input);
+  return out as unknown as CostEntryFormContext;
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+export async function resolveCostEntryFormContext(
+  db: DatabaseClient,
+  input: CostEntryFormInput,
+): Promise<CostEntryFormContext> {
+  const rows = await fetchRows(db, input);
+
+  assertJobFound(rows.job, input.jobId);
+  requireFound(rows.scope, input.scopeId, "scope", "scopeId");
+  requireFound(
+    rows.commitment,
+    input.commitmentId,
+    "commitment",
+    "commitmentId",
+  );
+  requireFound(rows.activity, input.activityId, "activity", "activityId");
+  requireFound(
+    rows.party,
+    input.counterpartyId,
+    "counterparty",
+    "counterpartyId",
+  );
+
+  const commitmentLabel =
+    rows.commitment !== undefined
+      ? await resolveCommitmentLabel(db, rows.commitment)
+      : undefined;
+
+  return buildContext(rows, input, commitmentLabel);
+}

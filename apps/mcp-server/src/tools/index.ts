@@ -2,6 +2,8 @@
 
 export * from "./_mcp-tool";
 export * from "./apply_patch";
+export * from "./cost_entry_form";
+export * from "./cost_entry_form.resolver";
 export * from "./create_job";
 export * from "./create_party";
 export * from "./create_project";

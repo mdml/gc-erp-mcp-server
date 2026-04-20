@@ -15,6 +15,7 @@ import {
   listScopes,
   recordCost,
   recordDirectCost,
+  registerCostEntryForm,
   registerToolOn,
   updateScope,
 } from "./tools";
@@ -65,6 +66,7 @@ export class GcErpMcp extends McpAgent<Env> {
     registerToolOn(this.server, issueNtp, db);
     registerToolOn(this.server, recordCost, db);
     registerToolOn(this.server, recordDirectCost, db);
+    registerCostEntryForm(this.server, db);
   }
   /* v8 ignore stop */
 }
