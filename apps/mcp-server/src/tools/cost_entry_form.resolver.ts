@@ -158,19 +158,23 @@ function fetchRows(
 // `not_found` McpToolError with structured details.
 // ---------------------------------------------------------------------------
 
+// Pure assertion — callers discard the return, so don't pretend to return
+// one. We can't use `asserts row is NonNullable<T>` here because the
+// "absent is OK" case is gated on `requestedId === undefined`, which TS's
+// assertion-signature grammar can't express as a conjunction. Downstream
+// code narrows via `if (rows.scope)` etc. in buildContext.
 function requireFound<T>(
   row: T | undefined,
   requestedId: string | undefined,
   label: string,
   detailsKey: string,
-): T | undefined {
-  if (requestedId === undefined) return undefined;
+): void {
+  if (requestedId === undefined) return;
   if (row === undefined) {
     throw new McpToolError("not_found", `${label} not found: ${requestedId}`, {
       [detailsKey]: requestedId,
     });
   }
-  return row;
 }
 
 function assertJobFound(
