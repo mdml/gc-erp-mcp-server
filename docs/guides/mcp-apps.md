@@ -177,7 +177,23 @@ Without an explicit `rules` entry, `wrangler deploy --dry-run --outdir dist` emi
 
 `bun pm view @modelcontextprotocol/ext-apps` shows `deps: 0`. The entire `dist/` has zero `node:*` imports (verified via `grep -rE "from ['\"]node:" dist/`). This is stronger than spike §5 claimed — the spike verified only the `/server` subpath. The engines field says `node >= 20` but it's advisory; the code is Workers-clean.
 
-### 6.7 `getUiCapability` at server-init time returns undefined
+### 6.7 `App.callServerTool` takes an object, not positional args
+
+Spike 0001 §6c shows the submission-from-view call as `app.callServerTool("record_cost", { /* args */ })` — positional. That shape **does not ship in 1.6.0**. The class declares a single signature in `dist/src/app.d.ts:784`:
+
+```ts
+callServerTool(params: CallToolRequest["params"], options?: RequestOptions): Promise<CallToolResult>;
+```
+
+`CallToolRequest["params"]` is the MCP SDK's `{ name: string; arguments?: Record<string, unknown>; _meta?: ...; task?: ... }` shape (see `@modelcontextprotocol/sdk/dist/esm/types.d.ts:2727` for the zod schema). So the working call is the object form in §3:
+
+```ts
+await app.callServerTool({ name: "record_hello", arguments: { name: "max" } });
+```
+
+No overload accepts positional args — there's only the one method. When M3's slice calls `callServerTool` from the cost-entry view, use the object form.
+
+### 6.8 `getUiCapability` at server-init time returns undefined
 
 Our first POC cut called `getUiCapability(server.server.getClientCapabilities())` at construction time and always got `undefined` — because the server hasn't seen the client's `initialize` yet. For our progressive-enhancement pattern, the capability probe needs to run *inside* the `McpAgent.init()` callback after the first message, or be deferred to a per-request branch. Spike §8e's sketch is right in spirit but the exact call-site matters.
 
@@ -194,6 +210,7 @@ Our first POC cut called `getUiCapability(server.server.getClientCapabilities())
 | `resources/read` returns `text/html;profile=mcp-app` + `_meta.ui` | **Verified** 2026-04-20 | live curl against POC `/mcp` |
 | `tools/call` on a plain tool (submission path) works in-session | **Verified** 2026-04-20 | live curl against POC `/mcp` |
 | Server-side dev loop: edit HTML → reload → new `resources/read` | **Verified** 2026-04-20 | bumped a version marker, re-fetched on same session |
+| `App.callServerTool` signature against SDK 1.6.0 `.d.ts` | **Verified** 2026-04-20 (static, not exercised end-to-end) | `dist/src/app.d.ts:784` declares one signature: object param, no positional overload. See §6.7. |
 | Claude Desktop renders the view end-to-end | **Unverified** — needs human Desktop session | POC didn't drive a real host; blocker to M3 close |
 | Desktop honors `notifications/resources/updated` for HTML changes | **Unverified** | Spec supports it; cache behavior undocumented |
 | Desktop tolerates `esm.sh` in `resourceDomains` CSP | **Unverified** | Moot once we bundle with Vite singlefile |
@@ -206,7 +223,7 @@ When M3's `slice/cost-entry-form` starts, the concrete path is:
 
 1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `packages/mcp-server/package.json`. **Timebox the 7-day quarantine exception** per [spike 0001 §2](../spikes/0001-mcp-apps-sdk.md): the version clears the window on 2026-04-21, so the `minimumReleaseAgeExcludes` entry in [`bunfig.toml`](../../bunfig.toml) is only needed if the slice lands before then. Verify first with `bun pm view @modelcontextprotocol/ext-apps time`.
 2. Scaffold `apps/cost-entry-form/` per spike §8a. The `packages/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
-3. Gate registration on `getUiCapability()` — but call it *inside* `McpAgent.init()` (or per-request), not at class construction (see §6.7).
+3. Gate registration on `getUiCapability()` — but call it *inside* `McpAgent.init()` (or per-request), not at class construction (see §6.8).
 4. Close the **unverified** rows in §7 during the first dogfood pass. Any row that stays unverified becomes a backlog entry before the slice merges.
 
 ---
