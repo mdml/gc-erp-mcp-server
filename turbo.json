@@ -17,25 +17,35 @@
   "tasks": {
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
     },
     "deploy": {
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
     },
     "tail": {
       "cache": false,
       "persistent": true
     },
     "lint": {},
-    "typecheck": {},
+    "typecheck": {
+      // Depends on upstream builds because apps/mcp-server imports
+      // @gc-erp/cost-entry-form/dist/cost-entry-form.html at typecheck time —
+      // the file must exist or tsc can't resolve the module, even with the
+      // Text-loader @ts-expect-error at the import site.
+      "dependsOn": ["^build"]
+    },
     "build": {
       "inputs": ["src/**", "vite.config.ts", "tsconfig.json", "package.json"],
       "outputs": ["dist/**"]
     },
     "test": {
+      "dependsOn": ["^build"],
       "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"]
     },
     "test:coverage": {
+      "dependsOn": ["^build"],
       "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"],
       "outputs": ["coverage/**"]
     },

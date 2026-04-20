@@ -32,6 +32,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@clerk/backend": "3.2.13",
+        "@gc-erp/cost-entry-form": "workspace:*",
         "@gc-erp/database": "workspace:*",
         "@modelcontextprotocol/ext-apps": "1.6.0",
         "@modelcontextprotocol/sdk": "1.29.0",
