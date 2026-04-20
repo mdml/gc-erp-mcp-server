@@ -67,6 +67,8 @@ direnv allow                 # one-time; direnv will now auto-load on cd
 
 After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MCP_BEARER_TOKEN` (local-only fixture; prod uses OAuth per [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md)), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, plus any developer secrets you provided refs for. Rotate by re-running `turbo run sync-secrets` + `direnv reload`.
 
+Node version is pinned via `.nvmrc` (currently `24`, the active LTS). If you use `nvm` / `fnm` / `mise` / `asdf`, they'll auto-switch on `cd` into the repo. If you upgrade your local Node (or Bun) and then `bun run gate` fails with `The module … was compiled against a different Node.js version … NODE_MODULE_VERSION`, a cached native binding (most likely `better-sqlite3`) is stale against the new ABI. `bun install` is a no-op against an unchanged lockfile, so the cache doesn't refresh on its own — run `bun install --force` to pull a fresh prebuild.
+
 ## Local dev
 
 ```bash
