@@ -3,7 +3,7 @@
  *
  * R2 buckets are API-provisionable. The list endpoint returns
  * `{ buckets: R2Bucket[] }` (nested, unlike D1's flat array). After `apply`,
- * the binding entry is written into packages/mcp-server/wrangler.jsonc.
+ * the binding entry is written into apps/mcp-server/wrangler.jsonc.
  *
  * Binding shape written to wrangler.jsonc:
  *   r2_buckets: [{ binding: "DOCUMENTS", bucket_name: "..." }]

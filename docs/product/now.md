@@ -6,13 +6,12 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 
 ## Up next
 
-1. **`apps/mcp-server/` move.** Per [ADR 0013](../decisions/0013-apps-layout-convention.md) Consequences → Harder: move `packages/mcp-server/` → `apps/mcp-server/`, update root `workspaces` glob, `.worktreeinclude`, CLAUDE.md § Repo shape, ARCHITECTURE.md, any `turbo.json` paths. Verify the parallel `agent-config` work has landed first (no scope overlap, but rebase cleaner if it's in).
-2. **Adopt `@modelcontextprotocol/ext-apps` in `apps/mcp-server/`.** Add v1.6.0; register a minimal app tool (no real UI yet); put the `getUiCapability()` probe in `McpAgent.init()`. Respect vendor-guide constraints §6.1/§6.3/§6.4/§6.7/§6.8.
-3. **Scaffold `apps/cost-entry-form/` as a Vite + singlefile project.** Minimal HTML + `App` + `PostMessageTransport` bootstrap per guide §3. Submission calls existing `record_cost`. Close guide §7 unverified rows in first Desktop dogfood; open backlog entries for anything that slips.
+1. **Adopt `@modelcontextprotocol/ext-apps` in `apps/mcp-server/`.** Add v1.6.0; register a minimal app tool (no real UI yet); put the `getUiCapability()` probe in `McpAgent.init()`. Respect vendor-guide constraints §6.1/§6.3/§6.4/§6.7/§6.8.
+2. **Scaffold `apps/cost-entry-form/` as a Vite + singlefile project.** Minimal HTML + `App` + `PostMessageTransport` bootstrap per guide §3. Submission calls existing `record_cost`. Close guide §7 unverified rows in first Desktop dogfood; open backlog entries for anything that slips.
 
 ## In flight
 
-- **`slice/cost-entry-form` — ADRs 0013 + 0014 drafted as commit 1** (branched from `main` at `4242661`). Implementation work queued above.
+- **`slice/cost-entry-form` — ADRs 0013 + 0014 active; `apps/` layout in place.** Commit sequence so far: (1) ADRs drafted as proposed, (2) `now.md` kickoff, (3) `packages/mcp-server/` → `apps/mcp-server/` move + ADRs flipped to active. Next commits: SDK wire-up then cost-entry-form scaffold.
 - **`packages/agent-config` PR-diff improvements** (separate agent). No file overlap with this slice.
 
 ## Waiting on

@@ -4,7 +4,7 @@
  * Mirrors `packages/database/src/seed/activities.test.ts` and
  * `src/schema/integration.test.ts` — same pattern, applied here so tool
  * handlers can exercise a real SQL round-trip without workerd/Miniflare
- * (forbidden by packages/mcp-server/CLAUDE.md §Testing).
+ * (forbidden by apps/mcp-server/CLAUDE.md §Testing).
  *
  * Thin factory; excluded from coverage in vitest.config.ts.
  */
@@ -19,9 +19,9 @@ export function createTestDb(): DatabaseClient {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
-  // Path is resolved relative to the test runner's cwd (packages/mcp-server).
+  // Path is resolved relative to the test runner's cwd (apps/mcp-server).
   migrate(db, {
-    migrationsFolder: "../database/src/migrations",
+    migrationsFolder: "../../packages/database/src/migrations",
   });
 
   // drizzle-d1 exposes `.batch([...])` with all-or-nothing semantics; the

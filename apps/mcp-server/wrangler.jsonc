@@ -30,7 +30,7 @@
       "binding": "DB",
       "database_name": "gc-erp",
       "database_id": "e6875d68-d032-47bd-aa79-efeb90f7527e",
-      "migrations_dir": "../database/src/migrations"
+      "migrations_dir": "../../packages/database/src/migrations"
     }
   ],
   "r2_buckets": [

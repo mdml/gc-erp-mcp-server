@@ -2,7 +2,7 @@
 
 Conventions for workspace packages under `packages/`.
 
-> **Every package (and every app, when we add the `apps/` tree) has its own `CLAUDE.md`.** Package-scoped instructions beat project-wide ones because Claude Code loads the nearest CLAUDE.md for any file it touches. When you create a new package, creating its CLAUDE.md is part of the checklist — not a later polish step.
+> **Every package (under `packages/`) and every app (under `apps/`) has its own `CLAUDE.md`.** Package-scoped instructions beat project-wide ones because Claude Code loads the nearest CLAUDE.md for any file it touches. When you create a new package or app, creating its CLAUDE.md is part of the checklist — not a later polish step. The `apps/*` vs `packages/*` split is per [ADR 0013](../docs/decisions/0013-apps-layout-convention.md) — `apps/*` holds user-facing shipping units (the Worker and its UI bundles); `packages/*` holds internal libraries.
 
 ## Naming
 
@@ -41,11 +41,11 @@ Focus on **pure logic**: validators, parsers, formatters, decision functions, tr
 
 Avoid heavy mocking of subprocesses or the filesystem just to test orchestration wiring. If a function's only job is to call `Bun.spawn` and check the exit code, exclude it from coverage rather than writing a brittle mock-heavy test.
 
-## Runtime vs. tooling packages
+## Runtime-library vs. tooling packages
 
-Two categories under `packages/`:
+Per [ADR 0013](../docs/decisions/0013-apps-layout-convention.md), user-facing shipping units (the Worker, UI bundles) live under `apps/`, not here. Two categories remain under `packages/`:
 
-- **Runtime packages** ship to production (`mcp-server`). Keep deps lean — every import grows the Worker bundle. No dev-only packages here.
-- **Tooling packages** (`dev-tools`) are internal — CLIs, scripts, gate runners. They never appear in the runtime bundle. Use Bun APIs (`Bun.spawn`, `Bun.file`) freely.
+- **Runtime libraries** — imported into an app's bundle at runtime (`database`). Keep deps lean — every import grows the deployed Worker bundle. No dev-only deps in the runtime-lib's `dependencies`.
+- **Tooling packages** (`dev-tools`, `infra`, `agent-config`) are internal — CLIs, scripts, gate runners, build-time config. They never appear in any runtime bundle. Use Bun APIs (`Bun.spawn`, `Bun.file`) freely.
 
-If you're unsure which category a new package belongs to, prefer tooling unless there's a clear reason the runtime needs it.
+If you're unsure which category a new package belongs to, prefer tooling unless there's a clear reason an app's runtime needs it.

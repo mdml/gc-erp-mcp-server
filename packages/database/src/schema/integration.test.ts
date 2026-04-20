@@ -12,7 +12,7 @@
  *   (3) Serves as a schema-graph smoke test: if one FK points at a removed
  *       column or a wrong type, this test throws at migration or insert time.
  *
- * Real D1 integration lives in `packages/mcp-server` once tools come online.
+ * Real D1 integration lives in `apps/mcp-server` once tools come online.
  */
 
 import Database from "better-sqlite3";

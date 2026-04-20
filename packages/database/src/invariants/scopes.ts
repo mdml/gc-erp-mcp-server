@@ -7,7 +7,7 @@ import type { JobId, ScopeId } from "../schema/ids";
  *       scope can't sit under a Basement job's framing scope.
  *   (2) No cycles — `parent→parent→…` must terminate at a root.
  *
- * Callers are the `create_scope` / `update_scope` tools in `packages/mcp-server`.
+ * Callers are the `create_scope` / `update_scope` tools in `apps/mcp-server`.
  * Pass `siblings` = every scope currently in the same job (including the
  * candidate when updating) so we can walk ancestry without hitting D1.
  */

@@ -2,7 +2,7 @@
 type: ADR
 id: "0013"
 title: "`apps/*` for user-facing shipping units; `packages/*` for internal libraries"
-status: proposed
+status: active
 date: 2026-04-20
 ---
 

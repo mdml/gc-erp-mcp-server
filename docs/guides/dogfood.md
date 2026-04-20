@@ -21,7 +21,7 @@ Local is cheap and resettable. Prod is where the job history lives.
 
 The two targets use different auth mechanisms on purpose — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) for the full rationale.
 
-- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `packages/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
+- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `apps/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
 - **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker proxies Clerk's `/.well-known/oauth-authorization-server` discovery doc (pointing clients at Clerk's hosted `/oauth/authorize`, `/oauth/token`, `/oauth/register`) and serves its own Clerk-shaped `/.well-known/oauth-protected-resource` metadata. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves via DCR, **redirect through Clerk's hosted consent page** (Clerk hosts the sign-in + scope approval UI — the Worker never renders one), and receive a Clerk-minted access token. The Worker validates that JWT on every `/mcp*` request via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; tool handlers read `userId` / `scopes` / `clientId` via `getMcpAuthContext().auth`.
 
 **Why the split:** claude.ai Custom Connectors on web + iOS + Android reject static bearer headers — they implement the MCP OAuth spec strictly. Claude Desktop historically accepted bearer headers, but with OAuth available it should use OAuth too (cleaner, per-user identity, works across all Claude surfaces). Local stays on bearer because the scenario runner is server-to-server and OAuth'ing every script invocation adds setup cost for no real security benefit — local D1 has no real data.
@@ -39,7 +39,7 @@ bun run db:migrate:local    # wrangler d1 migrations apply gc-erp --local
 bun run db:migrate:prod     # wrangler d1 migrations apply gc-erp --remote
 ```
 
-`db:migrate:prod` is the same as the legacy `db:migrate:remote` alias kept in `packages/mcp-server`. Prefer the root script going forward.
+`db:migrate:prod` is the same as the legacy `db:migrate:remote` alias kept in `apps/mcp-server`. Prefer the root script going forward.
 
 ### Database — seeding
 
@@ -160,7 +160,7 @@ The token `dev` is the fixed local value from `.dev.vars`. It is not a secret �
 
 > **Why `mcp-remote` and not `type: "http"`?** Claude Desktop's `claude_desktop_config.json` only accepts stdio entries today; entries with `type: "http"` (or similar streaming-transport shapes) are rejected as "not a valid MCP server configuration" at Desktop startup. We bridge via the `mcp-remote` npm package, which spawns a local stdio proxy that forwards to our HTTP server with the bearer header attached. The space-less `Authorization:${AUTH_HEADER}` + `AUTH_HEADER: "Bearer dev"` env split works around a Claude-Desktop-on-Windows spaces-in-args bug noted in [mcp-remote's readme](https://github.com/geelen/mcp-remote#readme) — Mac tolerates the space-ful form, but the env-split shape is portable.
 
-> **Why `turbo run dev` stays foreground — no daemon, no binary?** The `localhost:8787` target only answers while `turbo run dev` is running in a terminal, and that's deliberate. Daemonizing via LaunchAgent or wrapping in an on-demand launcher would eliminate the manual-start step but turn the dev server into an invisible background process — exactly where local-vs-prod drift sneaks in. Shipping a true stdio binary would require forking the runtime (no Durable Objects + D1 + R2 outside `workerd`), which breaks the "one Worker ships to prod" invariant in [`packages/mcp-server/CLAUDE.md`](../../packages/mcp-server/CLAUDE.md). Keeping the dev server foreground makes its state visible and its restart intentional, which matches the "local is cheap, resettable, experimental" posture above. Full tradeoffs and rejected options in [ADR 0011](../decisions/0011-local-mcp-dev-server-foreground.md).
+> **Why `turbo run dev` stays foreground — no daemon, no binary?** The `localhost:8787` target only answers while `turbo run dev` is running in a terminal, and that's deliberate. Daemonizing via LaunchAgent or wrapping in an on-demand launcher would eliminate the manual-start step but turn the dev server into an invisible background process — exactly where local-vs-prod drift sneaks in. Shipping a true stdio binary would require forking the runtime (no Durable Objects + D1 + R2 outside `workerd`), which breaks the "one Worker ships to prod" invariant in [`apps/mcp-server/CLAUDE.md`](../../apps/mcp-server/CLAUDE.md). Keeping the dev server foreground makes its state visible and its restart intentional, which matches the "local is cheap, resettable, experimental" posture above. Full tradeoffs and rejected options in [ADR 0011](../decisions/0011-local-mcp-dev-server-foreground.md).
 
 ### `install:mcp:prod` — prints the connection guide
 
@@ -207,16 +207,16 @@ Run these in order. Each is independently safe to retry.
 1. `bun run db:migrate:prod` — apply pending migrations (idempotent; wrangler shows a diff)
 2. `bun run db:seed:activities:prod` — seed starter activities (idempotent)
 3. Verify Clerk OAuth secrets + instance config are in place (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)):
-   - Upload the Clerk secrets via `wrangler secret put` — run from inside `packages/mcp-server/` (wrangler reads `wrangler.jsonc` from the cwd):
+   - Upload the Clerk secrets via `wrangler secret put` — run from inside `apps/mcp-server/` (wrangler reads `wrangler.jsonc` from the cwd):
      ```bash
-     (cd packages/mcp-server && bunx wrangler secret put CLERK_SECRET_KEY)
-     (cd packages/mcp-server && bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
+     (cd apps/mcp-server && bunx wrangler secret put CLERK_SECRET_KEY)
+     (cd apps/mcp-server && bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
      ```
      `wrangler` prompts for the value on stdin; paste the Clerk-issued key. **Do not** use `--var KEY=VAL` — wrangler 4.x parses values into argv, so the secret ends up in shell history / process listings / error output. Past incident (PR #29): `CLERK_SECRET_KEY` leaked to stdout via a malformed `--var` invocation and had to be rotated.
    - Clerk dashboard → OAuth applications → **Dynamic Client Registration toggled on** (so claude.ai can self-register);
    - No `MCP_BEARER_TOKEN` in prod Cloudflare secrets.
 
-   > **Slices that change the names of prod secrets must copy the two `(cd packages/mcp-server && bunx wrangler secret put …)` lines above verbatim** — don't rewrite them from memory. The subshell pattern is load-bearing (wrangler needs the Worker's cwd to find `wrangler.jsonc`), and agent training data sometimes suggests repo-root invocations that fail with "Required Worker name missing." Verbatim-copy is the fix.
+   > **Slices that change the names of prod secrets must copy the two `(cd apps/mcp-server && bunx wrangler secret put …)` lines above verbatim** — don't rewrite them from memory. The subshell pattern is load-bearing (wrangler needs the Worker's cwd to find `wrangler.jsonc`), and agent training data sometimes suggests repo-root invocations that fail with "Required Worker name missing." Verbatim-copy is the fix.
 4. `bun run deploy` — deploy the Worker (no permission prompt when run from your shell; agent-config policy only intercepts when Claude invokes it)
 5. Verify the seed:
    ```bash
@@ -236,7 +236,7 @@ Run these in order. Each is independently safe to retry.
 
    This is the load-bearing smoke-test — it exercises the full Day-0 walkthrough (`create_party` → `create_project` → `create_job` → `create_scope` → `apply_patch` → `issue_ntp` → `get_scope_tree`) against live D1 over the real MCP HTTP transport. The scenario runner acquires a Clerk-minted token via the `scenario auth` helper (deferred to a future coding slice) and caches it locally.
 
-   On failure: tail the Worker with `bunx wrangler tail gc-erp-mcp-server --remote` from `packages/mcp-server/` and re-run. HTTP 401 from the runner → token expired or invalid; rerun `bun run scenario auth --target prod`.
+   On failure: tail the Worker with `bunx wrangler tail gc-erp-mcp-server --remote` from `apps/mcp-server/` and re-run. HTTP 401 from the runner → token expired or invalid; rerun `bun run scenario auth --target prod`.
 
 > **Why not a one-shot `curl`?** The streaming HTTP transport is stateful — `tools/list` requires an `Mcp-Session-Id` header obtained from a prior `initialize` handshake. A single `curl tools/list` returns HTTP 400 with `Mcp-Session-Id header is required`, which looks like a bug but isn't. If you need a curl-level check, do it as two requests: POST `initialize` (capture `Mcp-Session-Id` from the response headers), then POST `tools/list` carrying that header and a valid Clerk-issued bearer. The scenario runner does both for you.
 

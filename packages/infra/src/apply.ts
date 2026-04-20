@@ -8,7 +8,7 @@
  * silently overwritten.
  *
  * After D1/R2 are created, their binding IDs are written back to
- * packages/mcp-server/wrangler.jsonc. Run `bun run deploy` to apply.
+ * apps/mcp-server/wrangler.jsonc. Run `bun run deploy` to apply.
  */
 
 import { infra } from "./infra.config";

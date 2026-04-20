@@ -15,7 +15,7 @@ An MCP extension (SEP-1865, [spec 2026-01-26](https://github.com/modelcontextpro
 The smallest thing that actually rendered end-to-end in the POC. Compiles, bundles, and `tools/list` / `resources/read` return the right shapes.
 
 ```ts
-// Worker entry — uses agents' McpAgent (same as packages/mcp-server/).
+// Worker entry — uses agents' McpAgent (same as apps/mcp-server/).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   RESOURCE_MIME_TYPE,
@@ -167,7 +167,7 @@ zod 3.24 compiles the package itself but `registerAppTool` hits `TS2589: Type in
 
 ### 6.4 Wrangler's default HTML handling splits the bundle
 
-Without an explicit `rules` entry, `wrangler deploy --dry-run --outdir dist` emits the view HTML as a separate file (`<hash>-view.html`) alongside `index.js`. That works for deploy, but the `import VIEW_HTML from "./view.html"` typechecks as a binding the runtime resolves — which means **breaking the Worker's "one bundle" posture.** For `packages/mcp-server/` we want the HTML *inlined* into the JS bundle so it ships as a single module. The fix is an explicit Text-loader rule in `wrangler.jsonc` (shown in §2). The spike called out `fs.readFile` as the landmine; the real landmine is "wrangler silently chose a split-assets layout that type-checks."
+Without an explicit `rules` entry, `wrangler deploy --dry-run --outdir dist` emits the view HTML as a separate file (`<hash>-view.html`) alongside `index.js`. That works for deploy, but the `import VIEW_HTML from "./view.html"` typechecks as a binding the runtime resolves — which means **breaking the Worker's "one bundle" posture.** For `apps/mcp-server/` we want the HTML *inlined* into the JS bundle so it ships as a single module. The fix is an explicit Text-loader rule in `wrangler.jsonc` (shown in §2). The spike called out `fs.readFile` as the landmine; the real landmine is "wrangler silently chose a split-assets layout that type-checks."
 
 ### 6.5 SDK exports more subpaths than the spike enumerated
 
@@ -221,8 +221,8 @@ Our first POC cut called `getUiCapability(server.server.getClientCapabilities())
 
 When M3's `slice/cost-entry-form` starts, the concrete path is:
 
-1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `packages/mcp-server/package.json`. **Timebox the 7-day quarantine exception** per [spike 0001 §2](../spikes/0001-mcp-apps-sdk.md): the version clears the window on 2026-04-21, so the `minimumReleaseAgeExcludes` entry in [`bunfig.toml`](../../bunfig.toml) is only needed if the slice lands before then. Verify first with `bun pm view @modelcontextprotocol/ext-apps time`.
-2. Scaffold `apps/cost-entry-form/` per spike §8a. The `packages/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
+1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `apps/mcp-server/package.json`. **Timebox the 7-day quarantine exception** per [spike 0001 §2](../spikes/0001-mcp-apps-sdk.md): the version clears the window on 2026-04-21, so the `minimumReleaseAgeExcludes` entry in [`bunfig.toml`](../../bunfig.toml) is only needed if the slice lands before then. Verify first with `bun pm view @modelcontextprotocol/ext-apps time`.
+2. Scaffold `apps/cost-entry-form/` per spike §8a. The `apps/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
 3. Gate registration on `getUiCapability()` — but call it *inside* `McpAgent.init()` (or per-request), not at class construction (see §6.8).
 4. Close the **unverified** rows in §7 during the first dogfood pass. Any row that stays unverified becomes a backlog entry before the slice merges.
 

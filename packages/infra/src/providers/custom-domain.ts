@@ -2,7 +2,7 @@
  * Custom Domain provider — status + teardown.
  *
  * Attach is deliberately wrangler's responsibility via `custom_domain: true`
- * in `packages/mcp-server/wrangler.jsonc` routes — `wrangler deploy` sends the
+ * in `apps/mcp-server/wrangler.jsonc` routes — `wrangler deploy` sends the
  * right `PUT /accounts/{id}/workers/domains` with an `environment` value that
  * matches however it just deployed the Worker. Reinventing that here would
  * force an `[env.production]` block in wrangler.jsonc just to satisfy the

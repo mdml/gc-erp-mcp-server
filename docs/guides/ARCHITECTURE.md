@@ -48,7 +48,7 @@ For what the system *represents* — data model, job walkthrough, open questions
 
 ## 2. Repo layout
 
-Turbo-managed bun workspace. Four packages at v1:
+Turbo-managed bun workspace. One app + four libraries at v1:
 
 ```
 .
@@ -73,13 +73,22 @@ Turbo-managed bun workspace. Four packages at v1:
 ├── .envrc.enc                       # gitignored, per-developer, age-encrypted dotenv
 ├── .mcp.json                        # MCP servers for Claude Code (context7, codescene)
 ├── .github/                         # CI (TBD)
-└── packages/
-    ├── mcp-server/                  # the Cloudflare Worker — runtime
-    │   ├── src/index.ts             #   fetch handler + GcErpMcp class + timingSafeEqual
-    │   ├── src/*.test.ts            #   vitest suites
-    │   ├── vitest.config.ts         #   coverage thresholds: 90 overall / 70 per file
-    │   ├── wrangler.jsonc           #   Worker + DO binding + migration
-    │   └── .dev.vars.example
+├── apps/                            # user-facing shipping units (ADR 0013)
+│   └── mcp-server/                  # the Cloudflare Worker — the runtime; ships to production
+│       ├── src/index.ts             #   fetch handler + GcErpMcp class + timingSafeEqual
+│       ├── src/*.test.ts            #   vitest suites
+│       ├── vitest.config.ts         #   coverage thresholds: 90 overall / 70 per file
+│       ├── wrangler.jsonc           #   Worker + DO binding + migration
+│       └── .dev.vars.example
+└── packages/                        # internal libraries consumed by apps/* (ADR 0013)
+    ├── database/                    # data layer — SPEC.md §1 port; imported by mcp-server
+    │   ├── src/schema/              #   drizzle tables + Zod domain types (runtime)
+    │   ├── src/ids/                 #   `{prefix}_{nanoid21}` generators (runtime)
+    │   ├── src/invariants/          #   pure validators for constraints SQL can't express
+    │   ├── src/patches/hash.ts      #   content-addressed pat_<sha256> (runtime)
+    │   ├── src/client.ts            #   typed drizzle-D1 client factory (runtime)
+    │   ├── src/migrations/          #   drizzle-kit output SQL (tooling — applied by wrangler)
+    │   └── src/seed/                #   activity-library seeder + data (tooling)
     ├── dev-tools/                   # internal CLIs for LOCAL dev — never bundled into the runtime
     │   ├── src/sync-secrets.ts      #   1Password → age → .envrc.enc + .dev.vars
     │   ├── src/secrets.config.ts    #   declarative list of required secrets
@@ -90,17 +99,11 @@ Turbo-managed bun workspace. Four packages at v1:
     │   ├── src/lib/                 #   sole boundary: cloudflare-client (fetch), wrangler-adapter (Bun.spawn)
     │   ├── src/providers/           #   one file per resource kind (custom-domain, d1, r2; secrets next)
     │   └── src/{status,apply,teardown}.ts  # command entries (bun run infra:status etc.)
-    └── database/                    # data layer — SPEC.md §1 port; imported by mcp-server
-        ├── src/schema/              #   drizzle tables + Zod domain types (runtime)
-        ├── src/ids/                 #   `{prefix}_{nanoid21}` generators (runtime)
-        ├── src/invariants/          #   pure validators for constraints SQL can't express
-        ├── src/patches/hash.ts      #   content-addressed pat_<sha256> (runtime)
-        ├── src/client.ts            #   typed drizzle-D1 client factory (runtime)
-        ├── src/migrations/          #   drizzle-kit output SQL (tooling — applied by wrangler)
-        └── src/seed/                #   activity-library seeder + data (tooling)
+    └── agent-config/                # single source of truth for Claude Code permissions
+        └── src/policy/              #   allow/deny/mcp policy; installs .claude/settings.json via bun install
 ```
 
-**Why this split.** `mcp-server` is code shipped to production; `dev-tools` is machinery that makes the monorepo habitable. Keeping them separate means `mcp-server`'s bundle stays small and its deps stay relevant to what's actually deployed.
+**Why the `apps/` vs `packages/` split.** Per [ADR 0013](../decisions/0013-apps-layout-convention.md): `apps/*` holds user-facing shipping units (the Worker plus future UI bundles like `apps/cost-entry-form/` in M3); `packages/*` holds internal libraries consumed only by other workspaces. The classification axis is "does a human ever see this (directly or via the Worker)?" — not "does it deploy standalone?" Keeps UI bundles and the Worker in the same bucket even though only the Worker runs `wrangler deploy`.
 
 ---
 
@@ -109,7 +112,7 @@ Turbo-managed bun workspace. Four packages at v1:
 A single HTTP request from a client:
 
 1. **Edge entry.** Cloudflare routes the request to our Worker at `https://gc.leiserson.me` (attached via the `custom_domain: true` route in `wrangler.jsonc`; the `*.workers.dev` fallback is disabled).
-2. **Fetch handler** (`packages/mcp-server/src/index.ts` → `packages/mcp-server/src/handler.ts`):
+2. **Fetch handler** (`apps/mcp-server/src/index.ts` → `apps/mcp-server/src/handler.ts`):
    - `GET /` → plaintext banner, 200. Used as a trivial liveness check; no auth.
    - `GET /.well-known/oauth-authorization-server` → proxied verbatim from Clerk's FAPI discovery doc (`{fapi}/.well-known/oauth-authorization-server`). Prod only (local returns 404; local uses the bearer path).
    - `GET /.well-known/oauth-protected-resource` → Clerk-shaped protected-resource metadata; referenced from the `/mcp` 401's `www-authenticate` header. Prod only.
@@ -140,7 +143,7 @@ Three layers, each with a different lifecycle and a different failure mode.
                                     │
               ┌─────────────────────┴──────────────────────┐
               ▼                                            ▼
-     .envrc.enc                              packages/mcp-server/.dev.vars
+     .envrc.enc                              apps/mcp-server/.dev.vars
    (age-encrypted                            (plaintext, gitignored)
     to your pubkey,                                 │
     gitignored)                                     │
@@ -199,8 +202,8 @@ Files on disk, at rest:
 |-----------------------------------------|---------|------|--------------------------------------------|
 | `.envrc`                                | No      | Yes  | direnv shim — decryption logic only        |
 | `.envrc.enc`                            | Yes     | No   | age-encrypted dotenv (per-developer)       |
-| `packages/mcp-server/.dev.vars`         | Yes     | No   | wrangler dev local env (`MCP_BEARER_TOKEN=dev`; no `CLERK_*` — OAuth is prod-only) |
-| `packages/mcp-server/.dev.vars.example` | No      | Yes  | template                                   |
+| `apps/mcp-server/.dev.vars`         | Yes     | No   | wrangler dev local env (`MCP_BEARER_TOKEN=dev`; no `CLERK_*` — OAuth is prod-only) |
+| `apps/mcp-server/.dev.vars.example` | No      | Yes  | template                                   |
 | `packages/dev-tools/src/secrets.config.ts` | No   | Yes  | declarative list of secrets + op refs      |
 | 1Password `gc-erp`                      | Yes     | —    | source of truth — holds `MCP_BEARER_TOKEN` (local-dev convenience) + `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` (prod-only) + Cloudflare creds |
 | Cloudflare secret storage               | Yes     | —    | production runtime env — `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY`; no `MCP_BEARER_TOKEN` in prod |
@@ -221,7 +224,7 @@ wrangler → reads wrangler.jsonc (account_id pin refuses non-matching CLOUDFLAR
 ```
 
 - **One environment.** v1 has no staging. The canonical URL is `https://gc.leiserson.me`; `*.workers.dev` and preview URLs are explicitly disabled in `wrangler.jsonc` (`workers_dev: false`, `preview_urls: false`) so the auth surface is a single hostname. A rotation of `MCP_BEARER_TOKEN` + re-upload is enough to revoke access if the bearer leaks.
-- **Account pin.** `packages/mcp-server/wrangler.jsonc` declares `account_id` for the personal Cloudflare org that owns `leiserson.me`. Wrangler refuses to deploy if `CLOUDFLARE_ACCOUNT_ID` disagrees, turning cross-account mis-routes (e.g. a stale value in 1Password pointing at a different org) into a loud failure instead of a silent wrong-account deploy.
+- **Account pin.** `apps/mcp-server/wrangler.jsonc` declares `account_id` for the personal Cloudflare org that owns `leiserson.me`. Wrangler refuses to deploy if `CLOUDFLARE_ACCOUNT_ID` disagrees, turning cross-account mis-routes (e.g. a stale value in 1Password pointing at a different org) into a loud failure instead of a silent wrong-account deploy.
 - **Durable Object migrations** are declared in `wrangler.jsonc` under `migrations`. Each migration gets a tag (`v1`, `v2`, …). Adding SQL state later is a new migration, not a rewrite.
 - **Compatibility date** is pinned (`2026-04-15` at v1). Worker APIs evolve; pinning ensures old deploys don't start behaving differently after a platform update.
 - **Account-level provisioning** (custom domain, D1, and R2 — status, apply, teardown; Worker secrets follow) lives in [`packages/infra/`](../../packages/infra/) as a declarative manifest + per-command entry scripts — `bun run infra:{status,apply,teardown}`. `wrangler deploy` stays in charge of the Worker script, DO migrations, and the custom-domain *attach*; the infra CLI handles status, teardown, and the resources around the Worker that wrangler doesn't manage. See [ADR 0002](../decisions/0002-infra-cli.md).
@@ -302,7 +305,7 @@ Fast local checks fail loudly at the moment of authorship. Expensive checks move
 
 Pointers into the roadmap — things the architecture has slots for but doesn't yet use.
 
-- **Tools surface** — SPEC.md §1 Zod types are ported in `packages/database` (M1). Tool handlers that consume them live in `packages/mcp-server/src/tools/` per the `McpToolDef` + `createTestDb()` pattern (layer 1 of [ADR 0004](../decisions/0004-acceptance-testing-strategy.md)). Shipped through M2-so-far: `create_project`, `create_job`, `create_scope`, `update_scope`, `list_jobs`, `list_scopes`, `ensure_activity`, `create_party`, `apply_patch` (D1-batched projection per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md); voidedness projected on `commitments` per [ADR 0009](../decisions/0009-void-state-projected-on-commitments.md)). Remaining M2 verbs (`issue_ntp`, `record_cost`, `record_direct_cost`) land with the corresponding days in [TOOLS.md §6](../../TOOLS.md).
+- **Tools surface** — SPEC.md §1 Zod types are ported in `packages/database` (M1). Tool handlers that consume them live in `apps/mcp-server/src/tools/` per the `McpToolDef` + `createTestDb()` pattern (layer 1 of [ADR 0004](../decisions/0004-acceptance-testing-strategy.md)). Shipped through M2-so-far: `create_project`, `create_job`, `create_scope`, `update_scope`, `list_jobs`, `list_scopes`, `ensure_activity`, `create_party`, `apply_patch` (D1-batched projection per [ADR 0008](../decisions/0008-apply-patch-atomicity-via-d1-batch.md); voidedness projected on `commitments` per [ADR 0009](../decisions/0009-void-state-projected-on-commitments.md)). Remaining M2 verbs (`issue_ntp`, `record_cost`, `record_direct_cost`) land with the corresponding days in [TOOLS.md §6](../../TOOLS.md).
 - **Scenario runner** — `packages/dev-tools/src/scenarios/` (layer 2 of ADR 0004). `bun run scenario kitchen [--reset]` drives TOOLS.md §6 as per-Day async functions over MCP HTTP against `bun run dev`. Thin I/O wrapper — correctness lives in layer-1 tool tests. Day 0 shipped; Days 3/10/14/18/60 land as their tools do.
 - **D1 + R2 provisioning** — [ADR 0003](../decisions/0003-storage-split.md) locks D1 as the home for domain state and R2 for document blobs. The `packages/database` package owns schema, migrations, and seeds; the D1/R2 providers in `packages/infra/` land alongside (M1). The `GcErpMcp` DO's SQLite remains reserved for MCP-session-runtime state (owned by `agents/McpAgent`).
 - **MCP apps (UI components)** — [MCP Apps extension spec](https://modelcontextprotocol.io/extensions/apps/overview). First app targeted at M3 (cost-entry form).
@@ -321,7 +324,7 @@ Concrete starting points by task:
 
 - **"I want to run it locally."** → [README.md](../../README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](../../SPEC.md) → Narrative walkthrough.
-- **"I want to change what a tool returns."** → `packages/mcp-server/src/index.ts` → `GcErpMcp.init()`.
+- **"I want to change what a tool returns."** → `apps/mcp-server/src/index.ts` → `GcErpMcp.init()`.
 - **"I want to change the data model."** → [SPEC.md §1](../../SPEC.md) → `packages/database/src/schema/` (Zod + drizzle colocated per entity).
 - **"I want to add a new secret."** → `packages/dev-tools/src/secrets.config.ts`; add to 1Password vault; `turbo run sync-secrets`.
 - **"I want to add a new quality check."** → `packages/dev-tools/src/gate/checks.ts` and/or `lefthook.yml`.

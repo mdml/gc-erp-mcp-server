@@ -4,7 +4,7 @@ import { parseCodeHealthOutput } from "./checks";
 describe("parseCodeHealthOutput", () => {
   it("extracts the score and warnings from a realistic cs check fixture", () => {
     const output = [
-      "Analyzing packages/mcp-server/src/handler.ts",
+      "Analyzing apps/mcp-server/src/handler.ts",
       "Code health score: 8.5",
       "warn: Complex Method (score 3) in handleRequest",
       "warn: Large Method (score 2) in handleRequest",

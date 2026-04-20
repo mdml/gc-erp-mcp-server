@@ -10,7 +10,7 @@ This package has two halves that ship to different places. Keep them clean.
 
 | Half | Where it runs | What's in it |
 |---|---|---|
-| **Runtime** — imported into the Worker bundle | Cloudflare Worker (`packages/mcp-server`) | `src/schema/`, `src/ids/`, `src/invariants/`, `src/client.ts`, `src/index.ts` |
+| **Runtime** — imported into the Worker bundle | Cloudflare Worker (`apps/mcp-server`) | `src/schema/`, `src/ids/`, `src/invariants/`, `src/client.ts`, `src/index.ts` |
 | **Tooling** — runs outside the Worker, never bundled | `bun run` locally or in CI, `wrangler d1 migrations apply` at deploy | `src/migrations/` (SQL files), `src/seed/` |
 
 Runtime code must not reach for `Bun.*`, `process.*`, or any Node-only API — it runs inside V8/workerd. Tooling code is free to use Bun APIs. Keep the halves from leaking: a seed script importing from `client.ts` is fine; `client.ts` importing from a seed script is a layering bug.
@@ -61,7 +61,7 @@ src/
 - **IDs are `{prefix}_{nanoid21}`.** One prefix per entity (`proj_`, `job_`, `scope_`, `act_`, `cm_`, `actv_`, `ntp_`, `cost_`, `pat_`, `party_`, `doc_`). `DocumentId` is the one exception: `doc_<sha256>` (content-addressed). `PatchId` is also content-addressed: `pat_<sha256>`. Generators live in `src/ids/generate.ts`; don't roll ad-hoc `crypto.randomUUID()` calls inline.
 - **Append-only is a tool-layer discipline.** `costs` has no DB trigger preventing UPDATE/DELETE. Correctness lives in the `record_cost` tool (and this package's invariant validators) — not in D1. Same for patches.
 - **Cross-entity invariants live in `src/invariants/`.** SQL FK + NOT NULL catches shape; things like "Cost.scopeId's Scope.jobId equals Cost.jobId", scope-tree acyclicity, and `sum(activation.pricePortion) == price.total` are pure functions that mcp-server calls before writing.
-- **Migrations are additive.** Once a migration lands in `src/migrations/`, treat it as immutable — new changes go in new files. Editing an applied migration retroactively is a data-loss bug (matches the rule for DO migrations in `packages/mcp-server/CLAUDE.md`).
+- **Migrations are additive.** Once a migration lands in `src/migrations/`, treat it as immutable — new changes go in new files. Editing an applied migration retroactively is a data-loss bug (matches the rule for DO migrations in `apps/mcp-server/CLAUDE.md`).
 
 ## Testing
 
@@ -70,11 +70,11 @@ Schema + invariants are pure. Drizzle queries run against an in-process better-s
 - **Round-trip tests per entity.** A valid SPEC example parses; the parsed output re-validates; writing it through drizzle and reading it back returns an equivalent shape.
 - **Invariant tests for each validator.** Pass an entity, assert the validator accepts/rejects as expected. No DB fixture needed for pure validators; for ones that read siblings (scope-tree, cross-job FK), build the sibling set in-memory.
 - **Seed idempotency.** Run the activity seeder twice against a fresh DB; assert `SELECT COUNT(*)` is identical and that no duplicate slugs exist.
-- **Real D1 tests live in `packages/mcp-server`.** That's where the Worker + Miniflare is set up. Schema-level confidence comes from the better-sqlite3 integration here; end-to-end D1 confidence comes from integration tests alongside the tools that exercise the bindings.
+- **Real D1 tests live in `apps/mcp-server`.** That's where the Worker + Miniflare is set up. Schema-level confidence comes from the better-sqlite3 integration here; end-to-end D1 confidence comes from integration tests alongside the tools that exercise the bindings.
 
 ## Don't add
 
 - **`Bun.*` or Node APIs in `src/schema/` or `src/client.ts`.** Those modules run in the Worker. Tooling (`seed/`, migration helpers) can use Bun freely.
-- **Sugar verbs in `src/`.** Pure schema + validators + client. Tools (e.g. `record_cost`) belong in `packages/mcp-server/src/tools/`. This package is the dependency, not the consumer.
+- **Sugar verbs in `src/`.** Pure schema + validators + client. Tools (e.g. `record_cost`) belong in `apps/mcp-server/src/tools/`. This package is the dependency, not the consumer.
 - **A separate `types.ts` file.** Types are inferred from Zod (`z.infer<typeof Job>`) and re-exported from the schema file that owns them.
 - **Multi-currency hedging.** Until there's a dogfood job in a non-USD currency, don't carry a `currency` column.

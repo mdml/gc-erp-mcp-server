@@ -22,7 +22,7 @@
  *
  * `sync-secrets` writes each secret to its listed targets:
  *   - 'envrc':    encrypted into /.envrc.enc (loaded into the shell by direnv)
- *   - 'dev-vars': plaintext into packages/mcp-server/.dev.vars (read by `wrangler dev`)
+ *   - 'dev-vars': plaintext into apps/mcp-server/.dev.vars (read by `wrangler dev`)
  *
  * `localDevVars` always writes to .dev.vars and overrides any team/dev secret
  * of the same name to enforce the "local stays local" invariant.
@@ -76,7 +76,7 @@ export const teamSecrets: TeamSecret[] = [
 ];
 
 /**
- * Fixed literal values written to packages/mcp-server/.dev.vars on every
+ * Fixed literal values written to apps/mcp-server/.dev.vars on every
  * `bun run sync-secrets`. NOT secrets — these are dev-only defaults that
  * exist in source. Local D1 holds no real data, so the bearer is hardcoded
  * `dev`. Adding a real prod-only secret here would be a bug.

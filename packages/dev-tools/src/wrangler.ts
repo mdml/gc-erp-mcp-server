@@ -13,7 +13,7 @@
 import { fileURLToPath } from "node:url";
 
 /**
- * Absolute path to `packages/mcp-server/` — wrangler resolves
+ * Absolute path to `apps/mcp-server/` — wrangler resolves
  * `wrangler.jsonc`, the `d1_databases` binding, and the `migrations_dir`
  * from this directory. Computed from `import.meta.url` so the helper
  * works regardless of the shell's cwd.
@@ -23,8 +23,8 @@ import { fileURLToPath } from "node:url";
  * and leave wrangler in `packages/` with no `wrangler.jsonc` to find.
  */
 export function mcpServerDir(): string {
-  // src/wrangler.ts → packages/dev-tools/src/ → packages/mcp-server/
-  return fileURLToPath(new URL("../../mcp-server/", import.meta.url));
+  // src/wrangler.ts → packages/dev-tools/src/ → repo-root → apps/mcp-server/
+  return fileURLToPath(new URL("../../../apps/mcp-server/", import.meta.url));
 }
 
 export interface RunWranglerOpts {

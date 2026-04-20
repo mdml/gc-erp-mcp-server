@@ -10,7 +10,7 @@ For the product pitch → [docs/product/overview.md](docs/product/overview.md). 
 
 ## Repo shape
 
-- `packages/mcp-server/` — Cloudflare Worker (the runtime; ships to production)
+- `apps/mcp-server/` — Cloudflare Worker (the runtime; ships to production). Lives under `apps/` per [ADR 0013](docs/decisions/0013-apps-layout-convention.md): `apps/*` holds user-facing shipping units (the Worker plus future UI bundles like `apps/cost-entry-form/`); `packages/*` holds internal libraries.
 - `packages/database/` — SPEC §1 data layer: Zod + Drizzle schemas, migrations, seeds, typed D1 client; imported by mcp-server
 - `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, sync-secrets); never shipped
 - `packages/infra/` — internal CLI for *remote* Cloudflare provisioning (custom domain, [later] D1/R2/secrets); never shipped
@@ -42,7 +42,7 @@ These forms run without a permission prompt (policy lives in [packages/agent-con
 | Shape | Example | Notes |
 |---|---|---|
 | `bun install …` | `bun install`, `bun install --frozen-lockfile` | |
-| `bun run <anything>` | `bun run gate`, `bun run test`, `bun run --cwd packages/mcp-server test`, `bun run --filter @gc-erp/mcp-server test` | Broad glob. Flag position doesn't matter — `--cwd`, `--filter`, and extra args all match. |
+| `bun run <anything>` | `bun run gate`, `bun run test`, `bun run --cwd apps/mcp-server test`, `bun run --filter @gc-erp/mcp-server test` | Broad glob. Flag position doesn't matter — `--cwd`, `--filter`, and extra args all match. |
 | `bun pm view/ls/why …` | `bun pm view drizzle-orm time`, `bun pm ls --all`, `bun pm why esbuild` | Read-only: registry metadata + local-graph introspection. No lockfile mutation. |
 | `bunx <tool> …` | `bunx biome check .`, `bunx vitest run`, `bunx tsc --noEmit`, `bunx turbo run test` | Limited to the tools enumerated in `allow.ts` (biome, vitest, commitlint, tsc, turbo). |
 | `turbo run <task> …` | `turbo run test --filter=@gc-erp/mcp-server`, `turbo run typecheck` | Works for every task except `deploy` (denied). |
@@ -77,7 +77,7 @@ To change what auto-allows or denies, edit [packages/agent-config/src/policy/](p
 
 ### Runtime
 
-- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Clerk-issued OAuth JWT validated via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.CLERK_SECRET_KEY` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) and [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
+- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Clerk-issued OAuth JWT validated via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.CLERK_SECRET_KEY` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) and [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
 - Don't replace `timingSafeEqual` with `===` in the local-bearer path. Clerk's JWT validation handles its own timing-safety.
 - Durable Object migrations are additive. Editing an existing migration retroactively is a data-loss bug.
 
@@ -153,7 +153,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **"I want to know what it *does*."** → [SPEC.md](SPEC.md) → Narrative walkthrough.
 - **"I want to know how it's *built*."** → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md).
 - **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
-- **"I want to change a tool's response."** → [packages/mcp-server/CLAUDE.md](packages/mcp-server/CLAUDE.md).
+- **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
 - **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/CLAUDE.md) → `src/schema/<entity>.ts`.
 - **"I want to add a new secret."** → [packages/dev-tools/CLAUDE.md](packages/dev-tools/CLAUDE.md) → `src/secrets.config.ts`.
 - **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.
