@@ -8,6 +8,8 @@ Guides describe **how the system currently works**. If the code changes in a way
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Repo layout, runtime lifecycle, secrets flow, deploy, quality gates, toolchain choices. |
 | [session-workflow.md](session-workflow.md) | How a working session flows — orient → work → close. Branching model, where changes land, what tends to go wrong. |
+| [dogfood.md](dogfood.md) | Local + prod targets, how to connect Desktop / claude.ai, deploy checklist. |
+| [mcp-apps.md](mcp-apps.md) | Vendor guide for [`@modelcontextprotocol/ext-apps`](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) — minimum server + view shape, dev loop, gotchas, verified/unverified matrix. |
 
 ## When to update
 
