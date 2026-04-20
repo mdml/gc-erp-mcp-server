@@ -51,7 +51,7 @@ describe("formatContextSummary", () => {
     expect(text).toContain('commitment "Rogelio\'s Framing LLC"');
     expect(text).toContain('activity "Frame"');
     expect(text).toContain('counterparty "Client"');
-    expect(text).toContain("amount 12345 USD");
+    expect(text).toContain("amount 12345 cents USD");
     expect(text).toContain("incurredOn 2026-05-04");
     expect(text).toContain('memo "deposit"');
   });
