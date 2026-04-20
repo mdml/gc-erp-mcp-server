@@ -98,91 +98,102 @@ export async function runResolver(
   }
 }
 
+/* v8 ignore start -- workerd-only wiring; the resolver (the only testable
+ * branch) is covered in cost_entry_form.resolver.test.ts. Handler + fallback
+ * formatting are thin adapters over the resolver. */
+
+function registerAppVariant(
+  server: McpServer,
+  getDb: () => DatabaseClient,
+): void {
+  registerAppTool(
+    server,
+    TOOL_NAME,
+    {
+      title: "Cost entry form",
+      description: DESCRIPTION_APP,
+      inputSchema: CostEntryFormInput.shape,
+      _meta: { ui: { resourceUri: RESOURCE_URI, prefersBorder: true } },
+    },
+    async (input) => {
+      const result = await runResolver(getDb, input as CostEntryFormInput);
+      if (result instanceof McpToolError) return toErrorResult(result);
+      return {
+        content: [{ type: "text", text: "Opening cost-entry form…" }],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+  registerAppResource(
+    server,
+    "Cost entry form",
+    RESOURCE_URI,
+    {
+      description:
+        "Inline cost-entry form. Pre-fills from context provided by the `cost_entry_form` tool; submits via `record_cost`.",
+    },
+    async () => ({
+      contents: [
+        {
+          uri: RESOURCE_URI,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: COST_ENTRY_FORM_HTML as unknown as string,
+          _meta: { ui: { csp: { resourceDomains: [] }, prefersBorder: true } },
+        },
+      ],
+    }),
+  );
+}
+
+function registerPlainVariant(
+  server: McpServer,
+  getDb: () => DatabaseClient,
+): void {
+  server.registerTool(
+    TOOL_NAME,
+    { description: DESCRIPTION_PLAIN, inputSchema: CostEntryFormInput.shape },
+    async (input) => {
+      const result = await runResolver(getDb, input as CostEntryFormInput);
+      if (result instanceof McpToolError) return toErrorResult(result);
+      return { content: [{ type: "text", text: formatFallbackText(result) }] };
+    },
+  );
+}
+
 /**
  * Register `cost_entry_form` on the MCP server. Call this from
  * `McpAgent.init()`. The capability probe is deferred to `oninitialized`
  * on the low-level server, which fires after the client's `initialize`
  * handshake — the earliest point at which `getClientCapabilities()`
  * returns a populated map (vendor guide §6.8).
+ *
+ * Two safety checks wrap the body:
+ *
+ *   1. **Clobber audit.** We assign to `server.server.oninitialized`
+ *      directly. Verified 2026-04-20 via
+ *      `grep -rn "\.oninitialized\s*=" node_modules/.bun/node_modules/agents/ node_modules/.bun/node_modules/@modelcontextprotocol/sdk/dist/`
+ *      — no prior assignment exists in `agents@0.11.0` or
+ *      `@modelcontextprotocol/sdk@1.29.0` (the SDK only *reads* the hook in
+ *      `server/index.js:53`). If a future upgrade to either package starts
+ *      setting `.oninitialized`, this assignment will clobber it — rerun
+ *      the grep and chain via `prev?.(...args)` instead.
+ *   2. **Reconnect idempotency.** `registerAppTool` / `registerTool` throw
+ *      on duplicate names. If `oninitialized` fires twice on a session
+ *      lifecycle (reconnect, resubscribe, etc.), the second call must be a
+ *      no-op. The `registered` latch below guarantees that.
  */
-/* v8 ignore start -- workerd-only wiring; the resolver (the only testable
- * branch) is covered in cost_entry_form.resolver.test.ts. Handler + fallback
- * formatting are thin adapters over the resolver. */
 export function registerCostEntryForm(
   server: McpServer,
   getDb: () => DatabaseClient,
 ): void {
+  let registered = false;
   server.server.oninitialized = () => {
+    if (registered) return;
+    registered = true;
     const uiCap = getUiCapability(server.server.getClientCapabilities());
     const hasUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
-
-    if (hasUi) {
-      registerAppTool(
-        server,
-        TOOL_NAME,
-        {
-          title: "Cost entry form",
-          description: DESCRIPTION_APP,
-          inputSchema: CostEntryFormInput.shape,
-          _meta: {
-            ui: {
-              resourceUri: RESOURCE_URI,
-              prefersBorder: true,
-            },
-          },
-        },
-        async (input) => {
-          const result = await runResolver(getDb, input as CostEntryFormInput);
-          if (result instanceof McpToolError) return toErrorResult(result);
-          return {
-            content: [{ type: "text", text: "Opening cost-entry form…" }],
-            structuredContent: result as unknown as Record<string, unknown>,
-          };
-        },
-      );
-
-      registerAppResource(
-        server,
-        "Cost entry form",
-        RESOURCE_URI,
-        {
-          description:
-            "Inline cost-entry form. Pre-fills from context provided by the `cost_entry_form` tool; submits via `record_cost`.",
-        },
-        async () => ({
-          contents: [
-            {
-              uri: RESOURCE_URI,
-              mimeType: RESOURCE_MIME_TYPE,
-              text: COST_ENTRY_FORM_HTML as unknown as string,
-              _meta: {
-                ui: {
-                  csp: { resourceDomains: [] },
-                  prefersBorder: true,
-                },
-              },
-            },
-          ],
-        }),
-      );
-      return;
-    }
-
-    // Text-only fallback. Same tool name; different body.
-    server.registerTool(
-      TOOL_NAME,
-      {
-        description: DESCRIPTION_PLAIN,
-        inputSchema: CostEntryFormInput.shape,
-      },
-      async (input) => {
-        const result = await runResolver(getDb, input as CostEntryFormInput);
-        if (result instanceof McpToolError) return toErrorResult(result);
-        return {
-          content: [{ type: "text", text: formatFallbackText(result) }],
-        };
-      },
-    );
+    if (hasUi) registerAppVariant(server, getDb);
+    else registerPlainVariant(server, getDb);
   };
 }
 /* v8 ignore stop */
