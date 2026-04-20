@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cost entry</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #111111;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --accent: #1f2937;
+        --danger: #b91c1c;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h1 {
+        font-size: 1.1rem;
+        margin: 0 0 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+        gap: 6px 12px;
+        align-items: baseline;
+        margin-bottom: 12px;
+      }
+      .grid dt {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .grid dd {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .field span {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font: inherit;
+      }
+      #missingHint {
+        color: var(--danger);
+        font-size: 0.85rem;
+        margin: 8px 0;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+      #save {
+        padding: 8px 14px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font: inherit;
+        cursor: pointer;
+      }
+      #save:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Record cost</h1>
+
+    <dl class="grid">
+      <dt>Job</dt>
+      <dd id="jobName">—</dd>
+      <dt>Scope</dt>
+      <dd id="scopeName">—</dd>
+      <dt>Commitment</dt>
+      <dd id="commitmentLabel">—</dd>
+      <dt>Activity</dt>
+      <dd id="activityName">—</dd>
+      <dt>Counterparty</dt>
+      <dd id="counterpartyName">—</dd>
+    </dl>
+
+    <div id="missingHint" hidden></div>
+
+    <label class="field">
+      <span>Amount (cents)</span>
+      <input id="amount" type="number" min="0" step="1" />
+    </label>
+
+    <label class="field">
+      <span>Incurred on</span>
+      <input id="incurredOn" type="date" />
+    </label>
+
+    <label class="field">
+      <span>Source</span>
+      <select id="sourceKind">
+        <option value="invoice">Invoice</option>
+        <option value="direct">Direct</option>
+        <option value="tm">Time &amp; materials</option>
+        <option value="adjustment">Adjustment</option>
+      </select>
+    </label>
+
+    <div id="sourceDetail"></div>
+
+    <label class="field">
+      <span>Memo (optional)</span>
+      <textarea id="memo" rows="2"></textarea>
+    </label>
+
+    <div class="actions">
+      <button id="save" type="button" disabled>Save</button>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

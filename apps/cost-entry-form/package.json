@@ -1,0 +1,31 @@
+{
+  "name": "@gc-erp/cost-entry-form",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./dist/cost-entry-form.html": "./dist/cost-entry-form.html"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "lint": "biome check .",
+    "format": "biome check --write --unsafe .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.6.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "4.1.4",
+    "typescript": "6.0.2",
+    "vite": "8.0.8",
+    "vite-plugin-singlefile": "2.3.2",
+    "vitest": "4.1.4"
+  }
+}
