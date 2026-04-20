@@ -28,6 +28,10 @@
     },
     "lint": {},
     "typecheck": {},
+    "build": {
+      "inputs": ["src/**", "vite.config.ts", "tsconfig.json", "package.json"],
+      "outputs": ["dist/**"]
+    },
     "test": {
       "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"]
     },
