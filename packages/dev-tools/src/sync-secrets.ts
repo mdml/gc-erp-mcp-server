@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * sync-secrets — pull secrets from 1Password → /.envrc.enc + packages/mcp-server/.dev.vars
+ * sync-secrets — pull secrets from 1Password → /.envrc.enc + apps/mcp-server/.dev.vars
  *
  * Two categories (see secrets.config.ts):
  *   - Team secrets: fetched via project-baked op refs; hard-fail on any missing value.
@@ -39,7 +39,7 @@ import {
   teamSecrets,
 } from "./secrets.config";
 
-const MCP_SERVER_REL = "packages/mcp-server";
+const MCP_SERVER_REL = "apps/mcp-server";
 const ENV_OP_LOCAL_FILENAME = ".env.op.local";
 const ENV_OP_LOCAL_EXAMPLE = ".env.op.local.example";
 

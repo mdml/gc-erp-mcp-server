@@ -9,7 +9,7 @@
 ## 1. Conventions
 
 - **Names are `snake_case`.** Verb-first (`create_job`, `list_commitments`, `issue_ntp`). Matches the existing `ping` / `list_jobs` scaffold.
-- **One tool per file** under `packages/mcp-server/src/tools/<name>.ts`. Each module exports `{ name, description, inputSchema, outputSchema, handler }`. Zod schemas give us runtime validation, TypeScript types, and MCP JSON Schema for free.
+- **One tool per file** under `apps/mcp-server/src/tools/<name>.ts`. Each module exports `{ name, description, inputSchema, outputSchema, handler }`. Zod schemas give us runtime validation, TypeScript types, and MCP JSON Schema for free.
 - **Read vs write split.** Read tools are safe to call repeatedly; write tools mutate D1 and/or R2. Claude will compose them — read to gather context, write to commit.
 - **Errors are structured.** Handler throws `McpToolError(code, message, details)`. Codes: `not_found`, `invariant_violation`, `validation_error`, `dependency_missing`. The MCP client sees `isError: true` on the tool result; Claude is trained to read the text.
 - **Every write tool is idempotent where possible.** `ensure_activity({ slug })` returns the existing row if present; `issue_ntp` creates a new event (NTPs aren't idempotent by design — re-issuing *is* the semantic).
@@ -321,7 +321,7 @@ Kept as a trail of reasoning; the substance has moved into the relevant section.
 
 - **SPEC.md** is the source of truth for *types*. For the `Document` schema see [SPEC.md §1](SPEC.md) (`Document` + `CostSource.documentId`); §2 here carries only the fork trail.
 - **This file** is canonical for *verbs* (tool names, inputs, outputs, scenarios). Update in the same PR that lands or changes a tool.
-- **Per-tool implementation docs** live as Zod schemas + JSDoc on each `packages/mcp-server/src/tools/<name>.ts` module. The JSDoc is what the MCP client sees at `tools/list` time. This file is orientation; the code is the machine-readable contract.
+- **Per-tool implementation docs** live as Zod schemas + JSDoc on each `apps/mcp-server/src/tools/<name>.ts` module. The JSDoc is what the MCP client sees at `tools/list` time. This file is orientation; the code is the machine-readable contract.
 
 ---
 

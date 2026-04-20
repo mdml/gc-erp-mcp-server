@@ -15,7 +15,7 @@ See [SPEC.md](./SPEC.md) for the data model, a narrative walkthrough, and open q
 
 Turbo monorepo:
 
-- `packages/mcp-server/` — the Cloudflare Worker (MCP server). Runtime code.
+- `apps/mcp-server/` — the Cloudflare Worker (MCP server). Runtime code.
 - `packages/dev-tools/` — Bun-based internal tools. Currently ships `sync-secrets`.
 - `packages/agent-config/` — single source of truth for Claude Code permissions. Writes `.claude/settings.json` on every `bun install` (see [its CLAUDE.md](packages/agent-config/CLAUDE.md) to change the policy).
 
@@ -27,7 +27,7 @@ Secrets come from 1Password in two flavors:
 `turbo run sync-secrets` writes two local artifacts:
 
 - `/.envrc.enc` — age-encrypted dotenv, per-developer, auto-loaded by direnv on `cd`.
-- `/packages/mcp-server/.dev.vars` — plaintext for `wrangler dev`, gitignored.
+- `/apps/mcp-server/.dev.vars` — plaintext for `wrangler dev`, gitignored.
 
 Re-run `sync-secrets` to rotate.
 
@@ -70,7 +70,7 @@ After `direnv allow`, every new shell at the repo root gets `CLOUDFLARE_API_TOKE
 ## Local dev
 
 ```bash
-turbo run dev                # wrangler dev in packages/mcp-server — usually http://localhost:8787
+turbo run dev                # wrangler dev in apps/mcp-server — usually http://localhost:8787
 ```
 
 Smoke test (the bearer comes from `.dev.vars` and the direnv-exported env):
@@ -87,7 +87,7 @@ curl -s -X POST http://localhost:8787/mcp \
 
 ## Deploy
 
-Wrangler picks up `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from the env — no `wrangler login`, so this repo stays isolated from other Cloudflare-using repos on the same machine. `packages/mcp-server/wrangler.jsonc` also pins `account_id`, so a wrong `CLOUDFLARE_ACCOUNT_ID` fails loudly instead of cross-deploying.
+Wrangler picks up `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from the env — no `wrangler login`, so this repo stays isolated from other Cloudflare-using repos on the same machine. `apps/mcp-server/wrangler.jsonc` also pins `account_id`, so a wrong `CLOUDFLARE_ACCOUNT_ID` fails loudly instead of cross-deploying.
 
 ```bash
 turbo run deploy
@@ -98,8 +98,8 @@ Serves at `https://gc.leiserson.me`; the MCP path is `/mcp`. The `*.workers.dev`
 **One-time per environment**: the Clerk OAuth credentials live in 1Password and need to be uploaded as Cloudflare secrets so the deployed Worker can validate incoming JWTs. Do this once (and whenever they rotate):
 
 ```bash
-(cd packages/mcp-server && op read "op://gc-erp/clerk/secret-key"      | bunx wrangler secret put CLERK_SECRET_KEY)
-(cd packages/mcp-server && op read "op://gc-erp/clerk/publishable-key" | bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
+(cd apps/mcp-server && op read "op://gc-erp/clerk/secret-key"      | bunx wrangler secret put CLERK_SECRET_KEY)
+(cd apps/mcp-server && op read "op://gc-erp/clerk/publishable-key" | bunx wrangler secret put CLERK_PUBLISHABLE_KEY)
 ```
 
 Piping direct from `op read` keeps the values out of shell history and off disk. This is the intentional out-of-band step — not automated in v1. No `MCP_BEARER_TOKEN` is uploaded to prod; the bearer path only runs under `wrangler dev`.

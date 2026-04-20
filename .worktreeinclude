@@ -6,7 +6,7 @@
 # so copying it in is what makes `claude --worktree` work without manual setup.
 .envrc.enc
 
-# Wrangler local dev vars (matches packages/mcp-server/.dev.vars via gitignore semantics).
+# Wrangler local dev vars (matches apps/mcp-server/.dev.vars via gitignore semantics).
 .dev.vars
 
 # Personal 1Password refs — lets a dev optionally `eval $(op signin) && bun run sync-secrets`

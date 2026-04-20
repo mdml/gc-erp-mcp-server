@@ -18,7 +18,7 @@ Internal CLIs and gate machinery. **Nothing here ships to production** — this 
 - **Adding a new team secret** → add it to `teamSecrets` in `src/secrets.config.ts` (with its `op://gc-erp/...` ref) and create the corresponding item in 1Password. Run `turbo run sync-secrets`.
 - **Adding a new developer secret** → add it to `developerSecrets` in `src/secrets.config.ts` (name + description only, no ref), add the matching line to `.env.op.local.example` (blank value), and document in the description what gate it unlocks. Each developer then maps it to their personal `op://` ref in `.env.op.local`.
 - **Adding a new quality check to the gate** → edit `src/gate/checks.ts`. The check is a subprocess invocation; return a `CheckResult`.
-- **Adding a new internal CLI** (e.g. a doctor script) → new file in `src/`, new script in `package.json`. Do NOT make it a dependency of `packages/mcp-server`.
+- **Adding a new internal CLI** (e.g. a doctor script) → new file in `src/`, new script in `package.json`. Do NOT make it a dependency of `apps/mcp-server`.
 
 ## Testing approach
 
@@ -47,5 +47,5 @@ Exclude from coverage:
 
 ## Don't add
 
-- **Runtime deps the Worker would ever import.** This package is CLI-only; its deps inflate nothing. But if you find yourself importing `packages/dev-tools` from `packages/mcp-server`, stop — the dependency direction is wrong.
+- **Runtime deps the Worker would ever import.** This package is CLI-only; its deps inflate nothing. But if you find yourself importing `packages/dev-tools` from `apps/mcp-server`, stop — the dependency direction is wrong.
 - **Another CLI framework.** For v1, plain `process.argv` parsing is enough for the ~2 commands we have. If we ever grow past ~5, consider adding Commander — but not before.

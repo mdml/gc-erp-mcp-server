@@ -132,7 +132,7 @@ describe("applyD1", () => {
             binding: "DB",
             database_name: "gc-erp",
             database_id: "new-uuid",
-            migrations_dir: "../database/src/migrations",
+            migrations_dir: "../../packages/database/src/migrations",
           },
         ],
       },

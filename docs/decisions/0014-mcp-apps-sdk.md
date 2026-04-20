@@ -2,7 +2,7 @@
 type: ADR
 id: "0014"
 title: "Adopt `@modelcontextprotocol/ext-apps` for MCP Apps UIs"
-status: proposed
+status: active
 date: 2026-04-20
 spike: "0001"
 ---

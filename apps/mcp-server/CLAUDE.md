@@ -1,4 +1,4 @@
-# CLAUDE.md — packages/mcp-server
+# CLAUDE.md — apps/mcp-server
 
 The Cloudflare Worker. **This is the one and only thing that ships to production.** Every dep added here grows the deployed bundle; every line changed here affects live behavior for Max + Salman.
 

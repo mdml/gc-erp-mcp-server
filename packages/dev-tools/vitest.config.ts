@@ -23,7 +23,7 @@ export default defineConfig({
         // Pure declarative data.
         "src/secrets.config.ts",
         // Scenario-runner I/O wiring. Correctness is guarded by Layer-1 tool
-        // tests (packages/mcp-server/src/tools/*.test.ts) per ADR 0004
+        // tests (apps/mcp-server/src/tools/*.test.ts) per ADR 0004
         // §Decision; the runner is a thin transport wrapper that exists to
         // drive `bun run dev` in-process during demos. Pure helpers
         // (assert.ts, args.ts) stay covered.
