@@ -184,6 +184,11 @@ function assertJobFound(
 
 // ---------------------------------------------------------------------------
 // commitmentLabel ← Party.name(commitment.counterpartyId)
+//
+// M3 decision: bare counterparty name is the label. Ambiguity risk (two
+// commitments from one counterparty on a job) is tracked in
+// docs/product/backlog.md under "Data model / schema" and gets revisited
+// if dogfood surfaces a collision.
 // ---------------------------------------------------------------------------
 
 async function resolveCommitmentLabel(
