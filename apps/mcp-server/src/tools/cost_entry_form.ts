@@ -19,6 +19,12 @@
  * stands up the pre-fill surface.
  */
 
+// @ts-expect-error — wrangler's Text loader returns a string at runtime
+// (vendor guide §6.4). `@gc-erp/cost-entry-form`'s Vite singlefile build
+// produces `dist/cost-entry-form.html`; turbo.json wires `^build` onto
+// `typecheck`/`test`/`dev`/`deploy` so the artifact exists before this
+// resolves.
+import COST_ENTRY_FORM_HTML from "@gc-erp/cost-entry-form/dist/cost-entry-form.html";
 import type { DatabaseClient } from "@gc-erp/database";
 import {
   getUiCapability,
@@ -28,10 +34,6 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-// @ts-expect-error — wrangler's Text loader returns a string at runtime
-// (vendor guide §6.4). Integration swaps this import for the singlefile
-// bundle from apps/cost-entry-form/ in a later commit on the slice.
-import COST_ENTRY_FORM_HTML from "../cost-entry-form.stub.html";
 import { McpToolError } from "./_mcp-tool";
 import {
   type CostEntryFormContext,
