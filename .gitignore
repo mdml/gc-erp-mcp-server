@@ -31,3 +31,4 @@ coverage/
 
 # Scratch / working docs (session prompts, handoffs — keep out of history)
 PROMPTS.md
+.scratch/
