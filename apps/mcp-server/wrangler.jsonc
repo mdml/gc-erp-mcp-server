@@ -8,6 +8,11 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-04-15",
   "compatibility_flags": ["nodejs_compat"],
+  // Inline MCP-App view HTML into the Worker bundle at build time. Without
+  // this, wrangler emits HTML as a split asset (`<hash>-view.html`), which
+  // type-checks but breaks the single-bundle posture. Per ADR 0014 / vendor
+  // guide §6.4.
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": false }],
   // Disable the *.workers.dev fallback and preview URLs — the Worker is only
   // reachable via gc.leiserson.me, keeping the auth surface to one hostname.
   "workers_dev": false,

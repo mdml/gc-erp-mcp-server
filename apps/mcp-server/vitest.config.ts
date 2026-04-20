@@ -1,6 +1,25 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // Mirror wrangler's `rules: [{ type: "Text", globs: ["**/*.html"] }]`
+  // (wrangler.jsonc) at test time so `import html from "./foo.html"` reads
+  // the file's contents as a string. Without this, vite's default import
+  // analysis rejects the HTML file as unparseable JS.
+  plugins: [
+    {
+      name: "gc-erp:html-as-text",
+      enforce: "pre",
+      transform(_code, id) {
+        if (!id.endsWith(".html")) return;
+        const text = readFileSync(id, "utf8");
+        return {
+          code: `export default ${JSON.stringify(text)};`,
+          map: null,
+        };
+      },
+    },
+  ],
   test: {
     include: ["src/**/*.test.ts"],
     coverage: {
