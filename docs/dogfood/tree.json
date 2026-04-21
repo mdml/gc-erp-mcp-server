@@ -1,0 +1,313 @@
+{
+  "tree": [
+    {
+      "id": "scope_LGCkr1gf633UsjdVtCC6_",
+      "name": "Kitchen",
+      "committed": {
+        "cents": 0,
+        "currency": "USD"
+      },
+      "cost": {
+        "cents": 0,
+        "currency": "USD"
+      },
+      "variance": {
+        "cents": 0,
+        "currency": "USD"
+      },
+      "children": [
+        {
+          "id": "scope_wBH1sHFP12iBVirnuw_Md",
+          "name": "Demo",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_Ot48yAbWfpEwioaBBNUMi",
+          "name": "Framing",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_NEnEtMMSPl9TpZLad4syy",
+          "name": "Electrical",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": [
+            {
+              "id": "scope_T7T1PTaR9_NEPua7e3rPk",
+              "name": "Rough",
+              "parentId": "scope_NEnEtMMSPl9TpZLad4syy",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            },
+            {
+              "id": "scope_3pjsts_sBg3BI2Q6uv1VM",
+              "name": "Trim",
+              "parentId": "scope_NEnEtMMSPl9TpZLad4syy",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "scope_74zU5XKUt-mH6kC9RJ9TO",
+          "name": "Plumbing",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": [
+            {
+              "id": "scope_yUh6KHOHIyXzCILzuGQ9N",
+              "name": "Rough",
+              "parentId": "scope_74zU5XKUt-mH6kC9RJ9TO",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            },
+            {
+              "id": "scope_2foTWG8o3nTwXTrAbTCgO",
+              "name": "Trim",
+              "parentId": "scope_74zU5XKUt-mH6kC9RJ9TO",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "scope_nsrKcenxaA7dcEnYH5CSi",
+          "name": "Drywall",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_zBiAgrAwWLh6iWXjKej2-",
+          "name": "Cabinets",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": [
+            {
+              "id": "scope_947kSxT2Jbm9uii27cFRZ",
+              "name": "Base",
+              "parentId": "scope_zBiAgrAwWLh6iWXjKej2-",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            },
+            {
+              "id": "scope_ATxFjcQcxKjcQD81qZ0uH",
+              "name": "Wall",
+              "parentId": "scope_zBiAgrAwWLh6iWXjKej2-",
+              "committed": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "cost": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "variance": {
+                "cents": 0,
+                "currency": "USD"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "scope_SbVZvmR205MtBf_pcFeXo",
+          "name": "Countertops",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_MUf9COZMx4pG-8zVQEHKw",
+          "name": "Backsplash",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_p0zYkb52EqfBd0c6euiuf",
+          "name": "Paint",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        },
+        {
+          "id": "scope_xjYvFLCcXQvgOxtIfKzz7",
+          "name": "Punch",
+          "parentId": "scope_LGCkr1gf633UsjdVtCC6_",
+          "committed": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "cost": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "variance": {
+            "cents": 0,
+            "currency": "USD"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}
