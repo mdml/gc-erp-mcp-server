@@ -14,3 +14,16 @@ ignoreUntil = "2026-07-17T00:00:00Z"
 # when drizzle-kit ships a release on @esbuild-kit/esm-loader >=2.6.6 or
 # bumps off esbuild-kit entirely; revisit in July 2026.
 reason = "esbuild dev-server CORS CVE in drizzle-kit transitive — dev server never invoked; drizzle-kit is build-time only"
+
+[[IgnoredVulns]]
+id = "GHSA-qx2v-qp2m-jg93"
+ignoreUntil = "2026-07-28T00:00:00Z"
+# postcss 8.5.9 is pulled transitively by vite@8.0.8 (a devDependency of
+# the cost-entry-form workspace). Vite uses postcss to transform CSS
+# during the cost-entry-form build; the resulting HTML is inlined via
+# vite-plugin-singlefile and shipped to R2 as a static asset — postcss
+# itself never reaches the prod Worker runtime. Fix is postcss >=8.5.10
+# (2026-04-15); resolves when vite ships a release pulling a newer
+# postcss, or via an explicit override. Revisit when the dogfood pause
+# ends and M4 work resumes (or by July 2026, whichever is earlier).
+reason = "postcss CVE — build-time-only transitive via vite for cost-entry-form bundle; never reaches prod runtime"
