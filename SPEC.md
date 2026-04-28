@@ -3,6 +3,8 @@
 > This is the contract for future sessions. The product is an **MCP server** — a TypeScript package distributed via `npx` / MCP client install — that exposes a commitment-based GC data model, tool methods, and MCP "apps" (UI components via the [MCP Apps extension](https://modelcontextprotocol.io/extensions/apps/overview)).
 >
 > Initial use case: Max + Salman GC'ing our own projects (1–5/year). Dogfood-first.
+>
+> **For the data-model big ideas — *why* it's shaped this way — see [docs/guides/ABSTRACTIONS.md](docs/guides/ABSTRACTIONS.md). This file is the schema; that guide is the framing.**
 
 ---
 

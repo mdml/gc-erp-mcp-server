@@ -324,6 +324,7 @@ Concrete starting points by task:
 
 - **"I want to run it locally."** → [README.md](../../README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](../../SPEC.md) → Narrative walkthrough.
+- **"I want to know the data-model big ideas."** → [ABSTRACTIONS.md](ABSTRACTIONS.md) → Five load-bearing claims.
 - **"I want to change what a tool returns."** → `apps/mcp-server/src/index.ts` → `GcErpMcp.init()`.
 - **"I want to change the data model."** → [SPEC.md §1](../../SPEC.md) → `packages/database/src/schema/` (Zod + drizzle colocated per entity).
 - **"I want to add a new secret."** → `packages/dev-tools/src/secrets.config.ts`; add to 1Password vault; `turbo run sync-secrets`.

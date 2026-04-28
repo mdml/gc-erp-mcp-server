@@ -1,6 +1,6 @@
 # CLAUDE.md — gc-erp-mcp-server
 
-> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
+> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Abstractions](docs/guides/ABSTRACTIONS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
 
 ## Project overview
 
@@ -151,6 +151,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 
 - **"I want to run it locally."** → [README.md](README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](SPEC.md) → Narrative walkthrough.
+- **"I want to know the data-model *big ideas*."** → [docs/guides/ABSTRACTIONS.md](docs/guides/ABSTRACTIONS.md) → Five load-bearing claims.
 - **"I want to know how it's *built*."** → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md).
 - **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
 - **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).

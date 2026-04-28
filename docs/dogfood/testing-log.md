@@ -14,6 +14,8 @@ Append-only log from dogfooding the deployed MCP server during development pause
 
 Ran a full [TOOLS §6](../../TOOLS.md) walkthrough against the deployed M3 MCP via claude.ai's MCP connector (`mcp__claude_ai_GC_ERP__*`). Goal: probe the data model, not natural-language ergonomics — explicit prompts, watch what the agent + server do. Raw scope tree snapshot saved at [`docs/dogfood/tree.json`](tree.json) (clean up later).
 
+*(2026-04-28 — Triaged: Next-session tasks → ABSTRACTIONS guide seeded at [`docs/guides/ABSTRACTIONS.md`](../guides/ABSTRACTIONS.md); ID-invariant decision and tool-description polish routed to [`backlog.md`](../product/backlog.md). What surprised me → 10 dated one-liners appended to [`retros/draft.md`](../retros/draft.md). Questions / ideas → 11 new entries in `backlog.md` §"Data model / schema", 1 in §"Patches / event sourcing", and 4 vision questions seeded as a new §"System topology". `tree.json` cleanup still pending.)*
+
 ### What I did
 
 - **Party / project / job:** created Nick Richards as a party, then a project ("Nick Richards Kitchen Remodel") + job ("Kitchen Remodel – 123 Governor St") with May 4 start date.
