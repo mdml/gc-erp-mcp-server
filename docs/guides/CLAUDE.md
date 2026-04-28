@@ -6,7 +6,8 @@ Guides describe **how the system currently works**. If the code changes in a way
 
 | Guide | What it covers |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Repo layout, runtime lifecycle, secrets flow, deploy, quality gates, toolchain choices. |
+| [ABSTRACTIONS.md](ABSTRACTIONS.md) | Data-model big ideas — four orthogonal axes joined by Activation, append-only history, the binding invariant, the simplification escape hatch. *Why* the schema is shaped this way. |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Repo layout, runtime lifecycle, secrets flow, deploy, quality gates, toolchain choices. *How* the machine is built. |
 | [session-workflow.md](session-workflow.md) | How a working session flows — orient → work → close. Branching model, where changes land, what tends to go wrong. |
 | [dogfood.md](dogfood.md) | Local + prod targets, how to connect Desktop / claude.ai, deploy checklist. |
 | [mcp-apps.md](mcp-apps.md) | Vendor guide for [`@modelcontextprotocol/ext-apps`](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) — minimum server + view shape, dev loop, gotchas, verified/unverified matrix. |

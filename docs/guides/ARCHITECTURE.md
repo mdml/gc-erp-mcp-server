@@ -317,6 +317,7 @@ Concrete starting points by task:
 
 - **"I want to run it locally."** → [README.md](../../README.md) → First-time setup.
 - **"I want to know what it *does*."** → [SPEC.md](../../SPEC.md) → Narrative walkthrough.
+- **"I want to know the data-model big ideas."** → [ABSTRACTIONS.md](ABSTRACTIONS.md) → Five load-bearing claims.
 - **"I want to change what a tool returns."** → `apps/mcp-server/src/index.ts` → `GcErpMcp.init()`.
 - **"I want to change the data model."** → [SPEC.md §1](../../SPEC.md) → `packages/database/src/schema/` (Zod + drizzle colocated per entity).
 - **"I want to add a new secret."** → `bunx dotenvx set NAME VAL -f .env.local` (per ADR 0015). If a turbo task's child needs to see it, also add the name to `globalPassThroughEnv` in `turbo.json`.
