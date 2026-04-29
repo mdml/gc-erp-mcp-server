@@ -109,6 +109,25 @@ async function seedWithCommitment(leadTimeDays = 5, buildTimeDays = 1) {
   return db;
 }
 
+/**
+ * Issues one NTP against the seeded commitment and fetches its persisted row,
+ * so note round-trip assertions can read both the handler result and the db.
+ */
+async function issueAndFetchPersistedNtp(input: {
+  activationId: ActivationId;
+  issuedOn: string;
+  note?: string;
+}) {
+  const db = await seedWithCommitment();
+  const result = await issueNtp.handler({ db, input });
+  const row = await db
+    .select()
+    .from(ntpEvents)
+    .where(eq(ntpEvents.id, result.ntp.id))
+    .get();
+  return { result, row };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -212,38 +231,23 @@ describe("issue_ntp", () => {
   });
 
   it("note round-trips when provided", async () => {
-    const db = await seedWithCommitment();
-
-    const result = await issueNtp.handler({
-      db,
-      input: { activationId, issuedOn: "2026-04-27", note: "site clear" },
+    const { result, row } = await issueAndFetchPersistedNtp({
+      activationId,
+      issuedOn: "2026-04-27",
+      note: "site clear",
     });
 
     expect(result.ntp.note).toBe("site clear");
-
-    const row = await db
-      .select()
-      .from(ntpEvents)
-      .where(eq(ntpEvents.id, result.ntp.id))
-      .get();
     expect(row?.note).toBe("site clear");
   });
 
   it("note is NULL in db when omitted", async () => {
-    const db = await seedWithCommitment();
-
-    const result = await issueNtp.handler({
-      db,
-      input: { activationId, issuedOn: "2026-04-27" },
+    const { result, row } = await issueAndFetchPersistedNtp({
+      activationId,
+      issuedOn: "2026-04-27",
     });
 
     expect(result.ntp.note).toBeUndefined();
-
-    const row = await db
-      .select()
-      .from(ntpEvents)
-      .where(eq(ntpEvents.id, result.ntp.id))
-      .get();
     expect(row?.note).toBeNull();
   });
 });

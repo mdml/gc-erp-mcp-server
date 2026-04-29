@@ -67,14 +67,58 @@ function throwingValidator() {
 
 const ctx = {} as ExecutionContext;
 
+// Default request shape used by most tests: stub MCP, default env builder, ctx.
+// `init` and `env` are optional so callers can override per-test.
+async function callHandler(
+  url: string,
+  init: RequestInit = { method: "GET" },
+  env: TestEnv = makeLocalEnv(),
+): Promise<Response> {
+  const fetch = makeFetchHandler(stubMcp());
+  return fetch(new Request(url, init), env, ctx);
+}
+
+// Convenience for the common local-mode shape: POST /mcp with a Bearer header
+// against a `makeLocalEnv(token)` env.
+function callMcpWithBearer(bearer: string, env: TestEnv = makeLocalEnv()) {
+  return callHandler(
+    "https://example.com/mcp",
+    { method: "POST", headers: { Authorization: `Bearer ${bearer}` } },
+    env,
+  );
+}
+
+// Builds a half-configured Clerk env so the handler falls back to local mode.
+// `keys` lets each test pick which half of the pair to set.
+function partialClerkEnv(keys: Partial<TestEnv>): TestEnv {
+  return {
+    MCP_OBJECT: {} as unknown as DurableObjectNamespace,
+    DB: {} as unknown as D1Database,
+    ...keys,
+  };
+}
+
+// Prod-mode harness: wires a fresh stubMcp + validator + makeProdEnv into a
+// fetch handler so each prod-mode test reads as a single call.
+function setupProd(validator = okValidator()) {
+  const mcp = stubMcp();
+  const fetch = makeFetchHandler(mcp, { validator });
+  return { mcp, validator, fetch };
+}
+
+async function callProd(
+  url: string,
+  init: RequestInit,
+  validator = okValidator(),
+) {
+  const harness = setupProd(validator);
+  const res = await harness.fetch(new Request(url, init), makeProdEnv(), ctx);
+  return { ...harness, res };
+}
+
 describe("GET /", () => {
   it("returns 200 text/plain with the banner", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/", { method: "GET" }),
-      makeLocalEnv(),
-      ctx,
-    );
+    const res = await callHandler("https://example.com/");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/plain");
     const body = await res.text();
@@ -85,61 +129,35 @@ describe("GET /", () => {
 
 describe("unknown path", () => {
   it("returns 404", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/nope", { method: "GET" }),
-      makeLocalEnv(),
-      ctx,
-    );
+    const res = await callHandler("https://example.com/nope");
     expect(res.status).toBe(404);
   });
 });
 
 describe("/mcp — local mode (no CLERK_SECRET_KEY)", () => {
   it("missing Authorization returns 401 with local WWW-Authenticate", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/mcp", { method: "POST" }),
-      makeLocalEnv(),
-      ctx,
-    );
+    const res = await callHandler("https://example.com/mcp", {
+      method: "POST",
+    });
     expect(res.status).toBe(401);
     expect(res.headers.get("www-authenticate")).toContain('realm="gc-erp"');
   });
 
   it("wrong bearer returns 401", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
-        method: "POST",
-        headers: { Authorization: "Bearer nope" },
-      }),
-      makeLocalEnv(),
-      ctx,
-    );
+    const res = await callMcpWithBearer("nope");
     expect(res.status).toBe(401);
   });
 
   it("same-length wrong bearer returns 401 (exercises constant-time compare)", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
-        method: "POST",
-        headers: { Authorization: "Bearer SUPER-SECRET" },
-      }),
+    const res = await callMcpWithBearer(
+      "SUPER-SECRET",
       makeLocalEnv("super-secret"),
-      ctx,
     );
     expect(res.status).toBe(401);
   });
 
   it("/mcp/<subpath> also requires auth", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/mcp/sse", { method: "GET" }),
-      makeLocalEnv(),
-      ctx,
-    );
+    const res = await callHandler("https://example.com/mcp/sse");
     expect(res.status).toBe(401);
   });
 
@@ -160,85 +178,45 @@ describe("/mcp — local mode (no CLERK_SECRET_KEY)", () => {
   });
 
   it("empty MCP_BEARER_TOKEN rejects every /mcp request (safer default)", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
-        method: "POST",
-        headers: { Authorization: "Bearer anything" },
-      }),
-      makeLocalEnv(""),
-      ctx,
-    );
+    const res = await callMcpWithBearer("anything", makeLocalEnv(""));
     expect(res.status).toBe(401);
   });
 
   it("GET /.well-known/oauth-authorization-server returns 404 in local mode", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://example.com/.well-known/oauth-authorization-server",
-        { method: "GET" },
-      ),
-      makeLocalEnv(),
-      ctx,
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-authorization-server",
     );
     expect(res.status).toBe(404);
   });
 
   it("GET /.well-known/oauth-protected-resource returns 404 in local mode", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/.well-known/oauth-protected-resource", {
-        method: "GET",
-      }),
-      makeLocalEnv(),
-      ctx,
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-protected-resource",
     );
     expect(res.status).toBe(404);
   });
 
   it("GET /authorize is a plain 404 in local mode (no authorize route exists)", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/authorize?response_type=code", {
-        method: "GET",
-      }),
-      makeLocalEnv(),
-      ctx,
+    const res = await callHandler(
+      "https://example.com/authorize?response_type=code",
     );
     expect(res.status).toBe(404);
   });
 
   it("partial Clerk config (only CLERK_SECRET_KEY) falls into local mode: discovery 404s", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://example.com/.well-known/oauth-authorization-server",
-        { method: "GET" },
-      ),
-      {
-        MCP_OBJECT: {} as unknown as DurableObjectNamespace,
-        DB: {} as unknown as D1Database,
-        CLERK_SECRET_KEY: "sk_live_test-secret",
-      },
-      ctx,
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-authorization-server",
+      { method: "GET" },
+      partialClerkEnv({ CLERK_SECRET_KEY: "sk_live_test-secret" }),
     );
     expect(res.status).toBe(404);
   });
 
   it("partial Clerk config (only CLERK_PUBLISHABLE_KEY) falls into local mode: discovery 404s", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://example.com/.well-known/oauth-authorization-server",
-        { method: "GET" },
-      ),
-      {
-        MCP_OBJECT: {} as unknown as DurableObjectNamespace,
-        DB: {} as unknown as D1Database,
-        CLERK_PUBLISHABLE_KEY: TEST_PUBLISHABLE_KEY,
-      },
-      ctx,
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-authorization-server",
+      { method: "GET" },
+      partialClerkEnv({ CLERK_PUBLISHABLE_KEY: TEST_PUBLISHABLE_KEY }),
     );
     expect(res.status).toBe(404);
   });
@@ -274,19 +252,14 @@ describe("/mcp — prod mode (CLERK_SECRET_KEY set)", () => {
   });
 
   it("invalid JWT (validator returns null) → 401 with resource_metadata_uri WWW-Authenticate", async () => {
-    const mcp = stubMcp();
-    const validator = rejectingValidator();
-    const fetch = makeFetchHandler(mcp, { validator });
-
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
+    const { mcp, res } = await callProd(
+      "https://example.com/mcp",
+      {
         method: "POST",
         headers: { Authorization: "Bearer eyJbad.jwt.token" },
-      }),
-      makeProdEnv(),
-      ctx,
+      },
+      rejectingValidator(),
     );
-
     expect(res.status).toBe(401);
     expect(res.headers.get("www-authenticate")).toContain(
       'resource_metadata_uri=".well-known/oauth-protected-resource"',
@@ -295,71 +268,41 @@ describe("/mcp — prod mode (CLERK_SECRET_KEY set)", () => {
   });
 
   it("validator throws → 401 (JWKS failure is not a 500 to the client)", async () => {
-    const mcp = stubMcp();
-    const validator = throwingValidator();
-    const fetch = makeFetchHandler(mcp, { validator });
-
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
+    const { mcp, res } = await callProd(
+      "https://example.com/mcp",
+      {
         method: "POST",
         headers: { Authorization: "Bearer eyJvalid.jwt.token" },
-      }),
-      makeProdEnv(),
-      ctx,
+      },
+      throwingValidator(),
     );
-
     expect(res.status).toBe(401);
     expect(mcp.fetch).not.toHaveBeenCalled();
   });
 
   it("missing Authorization header → 401 (no validator call)", async () => {
-    const mcp = stubMcp();
-    const validator = okValidator();
-    const fetch = makeFetchHandler(mcp, { validator });
-
-    const res = await fetch(
-      new Request("https://example.com/mcp", { method: "POST" }),
-      makeProdEnv(),
-      ctx,
-    );
-
+    const { mcp, validator, res } = await callProd("https://example.com/mcp", {
+      method: "POST",
+    });
     expect(res.status).toBe(401);
     expect(validator).not.toHaveBeenCalled();
     expect(mcp.fetch).not.toHaveBeenCalled();
   });
 
   it("Authorization header without Bearer prefix → 401 (no validator call)", async () => {
-    const mcp = stubMcp();
-    const validator = okValidator();
-    const fetch = makeFetchHandler(mcp, { validator });
-
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
-        method: "POST",
-        headers: { Authorization: "Basic dXNlcjpwYXNz" },
-      }),
-      makeProdEnv(),
-      ctx,
-    );
-
+    const { validator, res } = await callProd("https://example.com/mcp", {
+      method: "POST",
+      headers: { Authorization: "Basic dXNlcjpwYXNz" },
+    });
     expect(res.status).toBe(401);
     expect(validator).not.toHaveBeenCalled();
   });
 
   it("empty Bearer token → 401 (no validator call)", async () => {
-    const mcp = stubMcp();
-    const validator = okValidator();
-    const fetch = makeFetchHandler(mcp, { validator });
-
-    const res = await fetch(
-      new Request("https://example.com/mcp", {
-        method: "POST",
-        headers: { Authorization: "Bearer " },
-      }),
-      makeProdEnv(),
-      ctx,
-    );
-
+    const { validator, res } = await callProd("https://example.com/mcp", {
+      method: "POST",
+      headers: { Authorization: "Bearer " },
+    });
     expect(res.status).toBe(401);
     expect(validator).not.toHaveBeenCalled();
   });
@@ -382,14 +325,10 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
     );
 
     try {
-      const fetch = makeFetchHandler(stubMcp());
-      const res = await fetch(
-        new Request(
-          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
-          { method: "GET" },
-        ),
+      const res = await callHandler(
+        "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+        { method: "GET" },
         makeProdEnv(),
-        ctx,
       );
 
       expect(res.status).toBe(200);
@@ -409,14 +348,10 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
   });
 
   it("non-GET method returns 405", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://example.com/.well-known/oauth-authorization-server",
-        { method: "POST" },
-      ),
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-authorization-server",
+      { method: "POST" },
       makeProdEnv(),
-      ctx,
     );
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toContain("GET");
@@ -430,14 +365,10 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
       }),
     );
     try {
-      const fetch = makeFetchHandler(stubMcp());
-      const res = await fetch(
-        new Request(
-          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
-          { method: "GET" },
-        ),
+      const res = await callHandler(
+        "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+        { method: "GET" },
         makeProdEnv(),
-        ctx,
       );
       expect(res.status).toBe(500);
       expect(res.headers.get("cache-control")).toBe("no-store");
@@ -452,14 +383,10 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
       .spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new Error("network"));
     try {
-      const fetch = makeFetchHandler(stubMcp());
-      const res = await fetch(
-        new Request(
-          "https://gc.leiserson.me/.well-known/oauth-authorization-server",
-          { method: "GET" },
-        ),
+      const res = await callHandler(
+        "https://gc.leiserson.me/.well-known/oauth-authorization-server",
+        { method: "GET" },
         makeProdEnv(),
-        ctx,
       );
       expect(res.status).toBe(502);
       expect(res.headers.get("cache-control")).toBe("no-store");
@@ -473,14 +400,10 @@ describe("GET /.well-known/oauth-authorization-server — prod mode", () => {
 
 describe("GET /.well-known/oauth-protected-resource — prod mode", () => {
   it("returns 200 JSON with Clerk-shaped protected-resource metadata", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request(
-        "https://gc.leiserson.me/.well-known/oauth-protected-resource",
-        { method: "GET" },
-      ),
+    const res = await callHandler(
+      "https://gc.leiserson.me/.well-known/oauth-protected-resource",
+      { method: "GET" },
       makeProdEnv(),
-      ctx,
     );
 
     expect(res.status).toBe(200);
@@ -499,13 +422,10 @@ describe("GET /.well-known/oauth-protected-resource — prod mode", () => {
   });
 
   it("non-GET method returns 405", async () => {
-    const fetch = makeFetchHandler(stubMcp());
-    const res = await fetch(
-      new Request("https://example.com/.well-known/oauth-protected-resource", {
-        method: "POST",
-      }),
+    const res = await callHandler(
+      "https://example.com/.well-known/oauth-protected-resource",
+      { method: "POST" },
       makeProdEnv(),
-      ctx,
     );
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toContain("GET");

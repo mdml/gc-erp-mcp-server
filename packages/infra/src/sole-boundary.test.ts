@@ -36,26 +36,28 @@ function isCommentLine(line: string): boolean {
   return trimmed.startsWith("//") || trimmed.startsWith("*");
 }
 
+function isScannable(file: string, boundaryFile: string): boolean {
+  if (file.endsWith(".test.ts")) return false;
+  if (file.endsWith(boundaryFile)) return false;
+  return true;
+}
+
+function offendersInFile(file: string, pattern: RegExp): string[] {
+  const lines = readFileSync(file, "utf8").split("\n");
+  return lines
+    .map((line, i) => ({ line, lineNo: i + 1 }))
+    .filter(({ line }) => !isCommentLine(line) && pattern.test(line))
+    .map(({ line, lineNo }) => `${file}:${lineNo}: ${line.trim()}`);
+}
+
 function findOffenders(
   files: string[],
   boundaryFile: string,
   pattern: RegExp,
 ): string[] {
-  const offenders: string[] = [];
-  for (const file of files) {
-    if (file.endsWith(".test.ts")) continue;
-    if (file.endsWith(boundaryFile)) continue;
-    const content = readFileSync(file, "utf8");
-    const lines = content.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (isCommentLine(line)) continue;
-      if (pattern.test(line)) {
-        offenders.push(`${file}:${i + 1}: ${line.trim()}`);
-      }
-    }
-  }
-  return offenders;
+  return files
+    .filter((file) => isScannable(file, boundaryFile))
+    .flatMap((file) => offendersInFile(file, pattern));
 }
 
 describe("sole boundary", () => {
