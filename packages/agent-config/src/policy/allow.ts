@@ -111,6 +111,16 @@ export const bashAllow: readonly string[] = [
   "Bash(bunx commitlint*)",
   "Bash(bunx tsc*)",
   "Bash(bunx turbo*)",
+  // dotenvx — encrypted-at-rest dotenv loader (ADR 0015). `set`/`get`/`run`
+  // are the surface; `run` is the wrapper used by wrangler wrappers and ad-hoc
+  // commands needing CLOUDFLARE_*. Decryption is per-process; the parent shell
+  // never holds plaintext.
+  "Bash(bunx dotenvx*)",
+
+  // CodeScene gate wrapper (ADR 0015) — bash script that sources
+  // CS_ACCESS_TOKEN from .env.local and runs `cs check` per file. Read-only
+  // gate; never writes or modifies state.
+  "Bash(bash scripts/codescene.sh*)",
 
   // Turbo tasks — everything except deploy (production, stays ASK).
   "Bash(turbo run lint*)",
@@ -118,7 +128,6 @@ export const bashAllow: readonly string[] = [
   "Bash(turbo run test*)",
   "Bash(turbo run test:coverage*)",
   "Bash(turbo run dev*)",
-  "Bash(turbo run sync-secrets*)",
   "Bash(turbo run install-agent-config*)",
   "Bash(turbo run tail*)",
 

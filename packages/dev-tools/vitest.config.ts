@@ -10,18 +10,9 @@ export default defineConfig({
         "src/**/*.test.ts",
         // Thin CLI entry — argv parsing only.
         "src/gate.ts",
-        // Thin CLI entry — dispatches to gate/checks pure helpers.
-        "src/code-health.ts",
-        // Shells out to subprocesses (bunx turbo, cs, git). Excluded rather than
-        // mocked — per the repo's coverage policy: exclude orchestrators, test logic.
-        // Pure helpers (parseCodeHealthOutput) are tested in checks.test.ts anyway.
+        // Subprocess orchestrator (bunx turbo). Pure helper getGateChecks
+        // is tested directly in checks.test.ts.
         "src/gate/checks.ts",
-        // Shells out to op + age; orchestration layer, not logic.
-        "src/sync-secrets.ts",
-        // Subprocess + file I/O primitives (run, opRead, ageEncrypt, writeAtomic).
-        "src/io.ts",
-        // Pure declarative data.
-        "src/secrets.config.ts",
         // Scenario-runner I/O wiring. Correctness is guarded by Layer-1 tool
         // tests (apps/mcp-server/src/tools/*.test.ts) per ADR 0004
         // §Decision; the runner is a thin transport wrapper that exists to

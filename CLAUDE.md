@@ -12,7 +12,7 @@ For the product pitch → [docs/product/overview.md](docs/product/overview.md). 
 
 - `apps/mcp-server/` — Cloudflare Worker (the runtime; ships to production). Lives under `apps/` per [ADR 0013](docs/decisions/0013-apps-layout-convention.md): `apps/*` holds user-facing shipping units (the Worker plus future UI bundles like `apps/cost-entry-form/`); `packages/*` holds internal libraries.
 - `packages/database/` — SPEC §1 data layer: Zod + Drizzle schemas, migrations, seeds, typed D1 client; imported by mcp-server
-- `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, sync-secrets); never shipped
+- `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, code-health CLI, scenario runner, db helpers); never shipped
 - `packages/infra/` — internal CLI for *remote* Cloudflare provisioning (custom domain, [later] D1/R2/secrets); never shipped
 - `packages/agent-config/` — single source of truth for Claude Code permissions; installs `.claude/settings.json` via `bun install`
 
@@ -22,18 +22,18 @@ Each package has its own `CLAUDE.md` with scope-specific instructions. Read the 
 
 ```bash
 bun install                     # workspaces resolve; in main, `prepare` installs lefthook hooks (skipped in worktrees — they share main's hooks)
-turbo run sync-secrets          # pulls secrets from 1Password → .envrc.enc + .dev.vars
-direnv allow                    # one-time; direnv auto-loads env on cd thereafter
+bunx dotenvx set NAME VAL -f .env.local  # seed secrets (per ADR 0015) — see README for the list
 turbo run dev                   # wrangler dev for the Worker
 turbo run typecheck             # tsc --noEmit across all packages
 turbo run test                  # vitest across all packages
 turbo run lint                  # biome
-bun run gate                    # full local gate (lint + typecheck + test)
+bun run gate                    # full local gate (lint + typecheck + test + code-health)
+bun run code-health             # whole-repo CodeScene sanity check (gates on score 10)
 bun run format                  # biome --write at repo root
-turbo run deploy                # deploy Worker to Cloudflare
+bunx dotenvx run -f .env.local -- turbo run deploy   # deploy Worker to Cloudflare
 ```
 
-Secrets are encrypted at rest per-developer via age (see [docs/guides/ARCHITECTURE.md §4](docs/guides/ARCHITECTURE.md)). Prereqs: `age`, `direnv`, `op` (1Password CLI), `bun`, `lefthook`, `osv-scanner`. `cs` (CodeScene CLI) is optional — if missing, the code-health gate warns loudly but passes.
+Secrets are encrypted at rest per-developer via [dotenvx](https://dotenvx.com) — `.env.local` (encrypted body) + `.env.keys` (private key), both gitignored, both per-developer. Decryption is per-process; the parent shell never holds plaintext. See [docs/guides/ARCHITECTURE.md §4](docs/guides/ARCHITECTURE.md) and [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md). Prereqs: `bun`, `lefthook`, `osv-scanner`, `cs` (CodeScene CLI — required: code-health hard-fails without it). `dotenvx` itself is a workspace devDep, resolved via `bunx`.
 
 ### Agent auto-allow — command shapes
 
@@ -46,6 +46,8 @@ These forms run without a permission prompt (policy lives in [packages/agent-con
 | `bun pm view/ls/why …` | `bun pm view drizzle-orm time`, `bun pm ls --all`, `bun pm why esbuild` | Read-only: registry metadata + local-graph introspection. No lockfile mutation. |
 | `bunx <tool> …` | `bunx biome check .`, `bunx vitest run`, `bunx tsc --noEmit`, `bunx turbo run test` | Limited to the tools enumerated in `allow.ts` (biome, vitest, commitlint, tsc, turbo). |
 | `turbo run <task> …` | `turbo run test --filter=@gc-erp/mcp-server`, `turbo run typecheck` | Works for every task except `deploy` (denied). |
+| `bunx dotenvx …` | `bunx dotenvx set CS_ACCESS_TOKEN … -f .env.local`, `bunx dotenvx run -f .env.local -- bunx wrangler deploy` | Encrypted-at-rest dotenv loader (ADR 0015). `set`/`get`/`run` all auto-allow; downstream commands inside `dotenvx run` hit their own allow/deny rules. |
+| `bash scripts/codescene.sh …` | `bash scripts/codescene.sh gate-check src/foo.ts`, `bash scripts/codescene.sh gate-all` | Bash wrapper around `cs` (per ADR 0015). `gate-check <file>` scores one file (used by lefthook pre-commit + pre-push); `gate-all` scores the whole repo (used by `bun run code-health`). |
 | `git fetch …` | `git fetch`, `git fetch origin feat/m1-data-model` | Updates remote-tracking refs only; no working-tree mutation. |
 | `git merge --ff-only …` | `git merge --ff-only origin/feat/m1-data-model` | Fast-forward only — refuses if non-FF, so it can't discard local commits. Safe alternative to `git reset --hard` for base-ref alignment. |
 | `git push origin <prefix>/*` | `git push origin slice/3-infra`, `git push -u origin feat/foo` | Conventional-commit prefixes only. Bare `git push` and pushes to `main` stay ASK. |
@@ -58,7 +60,7 @@ What **never** auto-runs (by deny):
 - `bun run deploy`, `bun run infra:apply`, `bun run infra:teardown` — production surfaces.
 - `turbo run deploy`, `wrangler deploy`, `wrangler secret …`, `wrangler login`.
 - `git push --force` (any variant), `git reset --hard`, `git branch -D`, `rm -rf …`.
-- Secret readers: `cat .envrc.enc`, `cat .dev.vars`, `printenv`, `env`, `op read`, `age -d`, `gh auth token`.
+- Secret readers: `cat .env.local`, `cat .env.keys`, `cat .env*` (broad), `printenv`, `env`, `gh auth token`.
 
 To change what auto-allows or denies, edit [packages/agent-config/src/policy/](packages/agent-config/src/policy/) — never hand-edit `.claude/settings.json` (it's a regenerated build output). See [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md).
 
@@ -118,10 +120,11 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 
 ### Secrets
 
-- Local-only: `MCP_BEARER_TOKEN` (fixed string `dev`). Prod-only: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` (Clerk — see [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md)). Everywhere: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. All live in 1Password (`gc-erp` vault).
-- Never write secrets to source files, commit messages, or stdout. `.dev.vars` and `.envrc.enc` are the only legitimate on-disk homes and both are gitignored.
-- Do not run `wrangler login` — it writes a user-wide OAuth token that bleeds across repos. We use env-var auth via direnv.
-- **Verify any CLI flag's exact syntax before routing a secret through it.** Run `<tool> <subcommand> --help` (or check the tool's docs) first, confirm the flag shape, *then* pipe or pass the secret. Past incident (PR #29): `wrangler dev --var CLERK_SECRET_KEY=<live-value>` leaked to stdout because wrangler 4.x expects `KEY:VAL` (colon), not `KEY=VAL` — the malformed flag was echoed back in the error. Key had to be rotated. Preferred shapes: `.dev.vars` (local) or `wrangler secret put <NAME>` reading from stdin (prod). If a CLI flag is the only path, verify it first.
+- **Storage:** [dotenvx](https://dotenvx.com) per [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md). Per-developer `.env.local` (encrypted body) + `.env.keys` (private key) at the repo root. Both gitignored. Decryption is per-process via `bunx dotenvx run -f .env.local -- <cmd>`; the parent shell never holds plaintext.
+- **What's a secret vs not:** `MCP_BEARER_TOKEN="dev"` is a public local-dev literal — lives in committed `apps/mcp-server/wrangler.jsonc` `vars`, NOT in `.env.local`. Real secrets in `.env.local`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (deploy), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` (rotation only — prod values live in Cloudflare's secret store), `CS_ACCESS_TOKEN` (code-health gate), `GH_TOKEN` (gh CLI).
+- **Never write secrets to source files, commit messages, or stdout.** `.env.local` and `.env.keys` are the only legitimate on-disk homes and both are gitignored. Don't pipe a decrypted value through any CLI without confirming where it lands.
+- **Do not run `wrangler login`** — it writes a user-wide OAuth token that bleeds across repos. We use env-var auth — wrap wrangler in `bunx dotenvx run -f .env.local --` so each invocation gets the creds.
+- **Verify any CLI flag's exact syntax before routing a secret through it.** Run `<tool> <subcommand> --help` (or check the tool's docs) first, confirm the flag shape, *then* pipe or pass the secret. Past incident (PR #29): `wrangler dev --var CLERK_SECRET_KEY=<live-value>` leaked to stdout because wrangler 4.x expects `KEY:VAL` (colon), not `KEY=VAL` — the malformed flag was echoed back in the error. Key had to be rotated. Preferred shapes: process-env via `bunx dotenvx run` (everywhere) or `wrangler secret put <NAME>` reading from stdin (prod). If a CLI flag is the only path, verify it first.
 
 ## Agent conventions
 
@@ -155,7 +158,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
 - **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
 - **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/CLAUDE.md) → `src/schema/<entity>.ts`.
-- **"I want to add a new secret."** → [packages/dev-tools/CLAUDE.md](packages/dev-tools/CLAUDE.md) → `src/secrets.config.ts`.
+- **"I want to add a new secret."** → `bunx dotenvx set NAME VAL -f .env.local` (per ADR 0015). If it needs to reach a turbo task's child process, also add the name to `globalPassThroughEnv` in [turbo.json](turbo.json).
 - **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.
 - **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/CLAUDE.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.
 - **"I want to make an architectural decision."** → [docs/decisions/CLAUDE.md](docs/decisions/CLAUDE.md) → copy `0000-template.md`.

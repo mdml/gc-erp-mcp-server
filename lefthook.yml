@@ -9,12 +9,15 @@ pre-commit:
     typecheck:
       run: turbo run typecheck
     code-health:
-      # CLI owns the semantics — hard-fails on missing cs, missing
-      # CS_ACCESS_TOKEN, unmeasured runs, or any score < 10.
-      # See packages/dev-tools/src/code-health.ts.
-      glob: "*.{ts,tsx,js,jsx,mjs}"
-      exclude: '*.{test,spec}.{ts,tsx,js,jsx,mjs}'
-      run: bun run code-health {staged_files}
+      # Per-file Code Health gate: every staged TS/JS file (source + tests +
+      # dev-tools — no exclusions) must score 10. Hard-fails if cs CLI or
+      # CS_ACCESS_TOKEN is unavailable. Sequential per-file via bash to avoid
+      # the lefthook + Bun.spawn-Promise.all + cs deadlock observed in earlier
+      # attempts. See scripts/codescene.sh + ADR 0015.
+      run: |
+        files=$(git diff --staged --name-only --diff-filter=AM -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' 2>/dev/null)
+        [ -z "$files" ] && exit 0
+        for f in $files; do bash scripts/codescene.sh gate-check "$f" || exit 1; done
 
 commit-msg:
   commands:
@@ -22,17 +25,29 @@ commit-msg:
       run: bunx commitlint --edit {1}
 
 pre-push:
+  parallel: true
   commands:
     gate:
+      # lint + typecheck + test (with coverage). Code-health is its own hook
+      # below — keeping it separate matches dogtag/derna2's shape and avoids
+      # mixing the bash-wrapped cs check into a bun-driven gate.
       run: bun run gate -- --coverage
     osv-scan:
       run: osv-scanner scan --config=osv-scanner.toml --lockfile=bun.lock
+    code-health:
+      # Branch-vs-base Code Health gate: every TS/JS file modified on this
+      # branch (vs `origin/main`) must score 10. Same hard-fail rules as
+      # pre-commit. Pipes through xargs to keep one cs invocation per file.
+      run: |
+        files=$(git diff origin/main...HEAD --name-only --diff-filter=AM -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' 2>/dev/null)
+        [ -z "$files" ] && exit 0
+        echo "$files" | xargs -I{} bash scripts/codescene.sh gate-check {}
 
 post-checkout:
   # Fires after `git worktree add`, `git clone`, and branch switches.
   # Bootstrap is idempotent: `bun install` is a no-op if the lockfile is
-  # satisfied, and sync-secrets is gated on `.envrc.enc` missing, so plain
-  # branch flips don't pay the 1Password round-trip.
+  # satisfied. Per ADR 0015, per-developer .env.local + .env.keys are copied
+  # into fresh worktrees by .worktreeinclude — no secret-sync step here.
   commands:
     bootstrap:
       run: bun run --cwd packages/agent-config bootstrap {1} {2} {3}

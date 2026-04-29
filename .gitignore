@@ -9,15 +9,11 @@ node_modules/
 # Cloudflare / wrangler
 .wrangler/
 
-# Secrets
-.envrc.enc
-.dev.vars
-.dev.vars.*
-!.dev.vars.example
+# Secrets — dotenvx (per ADR 0015)
 .env
 .env.*
+.env.keys
 !.env.example
-!.env.op.local.example
 
 # Build artifacts
 dist/

@@ -2,16 +2,11 @@
 # Gitignore syntax; only matched-AND-gitignored files are copied.
 # Docs: https://code.claude.com/docs/en/common-workflows#copy-gitignored-files-to-worktrees
 
-# Encrypted team/dev env body. Re-rendering requires an active 1Password session,
-# so copying it in is what makes `claude --worktree` work without manual setup.
-.envrc.enc
-
-# Wrangler local dev vars (matches apps/mcp-server/.dev.vars via gitignore semantics).
-.dev.vars
-
-# Personal 1Password refs — lets a dev optionally `eval $(op signin) && bun run sync-secrets`
-# inside the worktree to refresh secrets without hand-copying refs.
-.env.op.local
+# Per-developer dotenvx artifacts (ADR 0015). Encrypted body + matching private
+# key. Both gitignored. Copying both into a fresh worktree is what makes
+# `bunx dotenvx run -f .env.local -- …` work without re-keying.
+.env.local
+.env.keys
 
 # Agent permission policy. `bun install`'s post-checkout bootstrap regenerates
 # this from `packages/agent-config/src/policy/`, but Claude Code reads the file

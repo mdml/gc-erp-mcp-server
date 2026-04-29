@@ -42,7 +42,7 @@ For what the system *represents* — data model, job walkthrough, open questions
 - **Transport:** streamable HTTP, per the MCP spec. Stdio is out of scope — the server has to be reachable from phones.
 - **Session model:** Cloudflare `agents/McpAgent` backs each MCP session with its own Durable Object instance. The DO holds MCP-session runtime state only (transport, subscriptions, auth props from the OAuth flow). Domain state — jobs, commitments, costs, documents — lives in D1 and R2. See [ADR 0003](../decisions/0003-storage-split.md).
 - **Auth (prod):** Clerk is the OAuth 2.1 AS and hosts the consent page end-to-end. The Worker exposes `/.well-known/oauth-authorization-server` (proxied from Clerk's FAPI discovery doc) and `/.well-known/oauth-protected-resource` (Clerk-shaped metadata referenced from the `/mcp` 401's `www-authenticate`). `/mcp*` validates the Clerk-issued JWT via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })` and exposes `userId` / `scopes` / `clientId` to tool handlers via `getMcpAuthContext().auth`. No local `/authorize` route — clients go directly to Clerk's FAPI per the discovery doc. See [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md).
-- **Auth (local):** static bearer (`MCP_BEARER_TOKEN=dev` in `.dev.vars`). Gated on `env.CLERK_SECRET_KEY` absence — prod sets it, local doesn't. Keeps the scenario runner simple; local D1 holds no real data.
+- **Auth (local):** static bearer (`MCP_BEARER_TOKEN=dev` in `wrangler.jsonc` `vars`). Gated on `env.CLERK_SECRET_KEY` absence — prod sets it, local doesn't. Keeps the scenario runner simple; local D1 holds no real data.
 
 ---
 
@@ -69,8 +69,8 @@ Turbo-managed bun workspace. One app + four libraries at v1:
 ├── lefthook.yml                     # git hooks: pre-commit, commit-msg, pre-push
 ├── osv-scanner.toml                 # vuln scan config
 ├── turbo.json                       # task graph (dev, deploy, lint, typecheck, test, ...)
-├── .envrc                           # direnv shim — auto-decrypts .envrc.enc with age
-├── .envrc.enc                       # gitignored, per-developer, age-encrypted dotenv
+├── .env.local                       # gitignored, per-developer dotenvx-encrypted body (ADR 0015)
+├── .env.keys                        # gitignored, per-developer dotenvx private key
 ├── .mcp.json                        # MCP servers for Claude Code (context7, codescene)
 ├── .github/                         # CI (TBD)
 ├── apps/                            # user-facing shipping units (ADR 0013)
@@ -78,8 +78,7 @@ Turbo-managed bun workspace. One app + four libraries at v1:
 │       ├── src/index.ts             #   fetch handler + GcErpMcp class + timingSafeEqual
 │       ├── src/*.test.ts            #   vitest suites
 │       ├── vitest.config.ts         #   coverage thresholds: 90 overall / 70 per file
-│       ├── wrangler.jsonc           #   Worker + DO binding + migration
-│       └── .dev.vars.example
+│       └── wrangler.jsonc           #   Worker + DO binding + migration + local-dev `vars`
 └── packages/                        # internal libraries consumed by apps/* (ADR 0013)
     ├── database/                    # data layer — SPEC.md §1 port; imported by mcp-server
     │   ├── src/schema/              #   drizzle tables + Zod domain types (runtime)
@@ -90,9 +89,10 @@ Turbo-managed bun workspace. One app + four libraries at v1:
     │   ├── src/migrations/          #   drizzle-kit output SQL (tooling — applied by wrangler)
     │   └── src/seed/                #   activity-library seeder + data (tooling)
     ├── dev-tools/                   # internal CLIs for LOCAL dev — never bundled into the runtime
-    │   ├── src/sync-secrets.ts      #   1Password → age → .envrc.enc + .dev.vars
-    │   ├── src/secrets.config.ts    #   declarative list of required secrets
     │   ├── src/gate/                #   gate runner (typecheck, lint, test, code health)
+    │   ├── src/code-health.ts       #   per-file CodeScene CLI used by lefthook + `bun run code-health`
+    │   ├── src/scenarios/           #   end-to-end scenario runner (TOOLS.md replay)
+    │   ├── src/db/                  #   migrate / query / seed helpers
     │   └── src/*.test.ts
     ├── infra/                       # internal CLI for REMOTE Cloudflare state — never bundled
     │   ├── src/infra.config.ts      #   declarative desired state (worker, custom domain, …)
@@ -131,59 +131,54 @@ A single HTTP request from a client:
 
 ## 4. Secrets architecture
 
-Three layers, each with a different lifecycle and a different failure mode.
+Per [ADR 0015](../decisions/0015-dotenvx-secrets-management.md): per-developer keypair, per-process loading. No shell hook, no shared vault as code.
 
 ```
-                      1Password (gc-erp vault)
-                    [source of truth for all secrets]
+       per developer (gitignored, copied into worktrees via .worktreeinclude)
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │  /.env.local         encrypted body (per-value ECIES ciphertext)    │
+   │  /.env.keys          matching private key                           │
+   │  Both auto-generated on the first `bunx dotenvx set …`              │
+   └─────────────────────────────────────────────────────────────────────┘
                                     │
-                                    │ op read (on demand)
+                                    │ bunx dotenvx run -f .env.local -- <cmd>
+                                    │   (decrypts in-process; injects env into ONE
+                                    │    subprocess; exits. parent shell unchanged.)
                                     ▼
-                 packages/dev-tools/src/sync-secrets.ts
-                                    │
-              ┌─────────────────────┴──────────────────────┐
-              ▼                                            ▼
-     .envrc.enc                              apps/mcp-server/.dev.vars
-   (age-encrypted                            (plaintext, gitignored)
-    to your pubkey,                                 │
-    gitignored)                                     │
-         │                                          ▼
-         │ direnv + age -d                   read by `wrangler dev`
-         ▼                                   into the local Worker
-  shell env exports:                              (local dev only)
-  - CLOUDFLARE_API_TOKEN                          MCP_BEARER_TOKEN=dev
-  - CLOUDFLARE_ACCOUNT_ID                         (no CLERK_* — prod only)
-  - MCP_BEARER_TOKEN
-  - CLERK_SECRET_KEY       (prod use)
-  - CLERK_PUBLISHABLE_KEY  (prod use)
-         │
-         ▼
-    wrangler deploy
-    (reads env, no user-wide
-     `wrangler login` token)
+       process.env of the subprocess holds:
+         - CLOUDFLARE_API_TOKEN      (deploy)
+         - CLOUDFLARE_ACCOUNT_ID     (deploy)
+         - CLERK_SECRET_KEY          (rotation only — prod values live in CF secrets)
+         - CLERK_PUBLISHABLE_KEY     (rotation only)
+         - CS_ACCESS_TOKEN           (code-health gate)
+         - GH_TOKEN                  (gh CLI)
+
+                      MCP_BEARER_TOKEN="dev" is NOT a secret —
+                      it's a public local-dev literal in committed
+                      apps/mcp-server/wrangler.jsonc `vars`.
 
 
-                     [Cloudflare secrets — separate, one-time upload]
+       [Cloudflare secrets — separate, one-time upload via dotenvx-wrapped wrangler]
                                           │
                                           ▼
-                          wrangler secret put CLERK_SECRET_KEY
-                          wrangler secret put CLERK_PUBLISHABLE_KEY
-                             (encrypted at rest on Cloudflare;
-                              available to deployed Worker as env.*)
+                  bunx dotenvx run -f .env.local -- bunx wrangler secret put CLERK_SECRET_KEY
+                  bunx dotenvx run -f .env.local -- bunx wrangler secret put CLERK_PUBLISHABLE_KEY
+                         (encrypted at rest on Cloudflare;
+                          available to deployed Worker as env.*)
 
-                          MCP_BEARER_TOKEN is NOT uploaded to prod —
-                          prod uses Clerk JWT validation instead (ADR 0012).
+                  MCP_BEARER_TOKEN is NOT uploaded to prod —
+                  prod uses Clerk JWT validation instead (ADR 0012).
 ```
 
 **Why this shape.**
 
-- **1Password is the source of truth.** Both developers have access to the shared vault; rotation is a single edit in 1Password followed by `turbo run sync-secrets` on each machine.
-- **Age encryption is local-only.** `.envrc.enc` is encrypted to the developer's *own* pubkey (read from `~/.config/sops/age/keys.txt`). No multi-recipient complexity, no key server, no network. Each developer regenerates their own `.envrc.enc` from 1Password.
-- **direnv auto-loads on `cd`.** No `source .env` ritual; every shell at the repo root has the right env.
+- **Per-process loading, not shell state.** `bunx dotenvx run -f .env.local -- <cmd>` decrypts once for one subprocess and exits. The parent shell never holds plaintext, so `printenv` / a leaked env-dumping subprocess can't exfil values.
+- **Per-developer keypair.** Each developer's `.env.local` is encrypted only to their own public key (header line `DOTENV_PUBLIC_KEY_LOCAL=…`). The matching private key lives in `.env.keys`. No multi-recipient complexity, no key server, no network.
+- **No `.dev.vars` plaintext.** The local-bearer literal `MCP_BEARER_TOKEN="dev"` lives in committed `wrangler.jsonc` `vars`. Real secrets that prod-mode local testing might need (`CLERK_*`) come from `.env.local` via `bunx dotenvx run -f .env.local -- wrangler dev`.
 - **`wrangler login` is deliberately avoided.** It writes a user-wide OAuth token at `~/.wrangler/config/default.toml` that would then be picked up by every Cloudflare-touching repo on the machine. Max works in multiple GitHub orgs — per-project env-var auth keeps projects isolated.
-- **`.dev.vars` is separate from the shell env.** Wrangler reads `.dev.vars` into the *Worker's* runtime environment during `wrangler dev`; those bindings don't touch the shell. `sync-secrets` writes both artifacts from the same 1Password lookup.
-- **Prod uses Clerk OAuth, not a bearer (per [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)).** `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` are uploaded via `wrangler secret put` — one-time per rotation, deliberately manual. The old `MCP_BEARER_TOKEN` prod upload is retired; claude.ai Custom Connectors reject bearer headers in favor of OAuth 2.1 + DCR, and Clerk is the OAuth AS (with hosted consent — see ADR 0012 for why that matters vs. the superseded Stytch plan). `MCP_BEARER_TOKEN=dev` stays in local `.dev.vars` for `wrangler dev` and the scenario runner (local D1 holds no real data).
-- **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `OP_SERVICE_ACCOUNT_TOKEN` / `CLERK_SECRET_KEY` / `CLERK_PUBLISHABLE_KEY` variables above only reach their child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — the values don't get hashed into the task cache key. Without the declaration, wrangler sees no auth and silently falls back to OAuth — a class of bug the env-var auth pattern is meant to prevent, so the passthrough list is part of the secrets architecture, not a build-system detail.
+- **No shared rotation as code.** When a shared token (`CLOUDFLARE_API_TOKEN`, `CLERK_*`) rotates, exchange the new value out-of-band (Signal, ad-hoc 1Password share between Max and Salman) and each developer re-runs `bunx dotenvx set NAME NEW_VALUE -f .env.local`. Two-operator team makes this cheap; revisit if the team grows.
+- **Worktrees just work.** `.env.local` and `.env.keys` are listed in [`.worktreeinclude`](../../.worktreeinclude); they materialize alongside a fresh `claude --worktree` checkout. No bootstrap step, no `direnv allow`, no 1Password sign-in.
+- **Turbo 2.x scrubs env by default.** The `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `CLERK_SECRET_KEY` / `CLERK_PUBLISHABLE_KEY` / `CS_ACCESS_TOKEN` / `GH_TOKEN` variables only reach turbo task child processes because they're declared in `turbo.json`'s `globalPassThroughEnv`. Without the declaration, wrangler sees no auth and silently falls back to OAuth (— a class of bug the env-var auth pattern is meant to prevent), and `cs check` invocations from `bun run code-health` lose their token. `globalPassThroughEnv` (not `globalEnv`) is the right primitive for secrets — values don't get hashed into the task cache key.
 
 **`CLOUDFLARE_API_TOKEN` permission groups.** The token in 1Password needs the groups listed below. A missing group presents as a 401/403 from the specific endpoint that needs it — the symptom is service-specific (e.g. R2 works but D1 fails), *not* a blanket auth failure. Watch for that pattern when a new provider lands.
 
@@ -200,12 +195,9 @@ Files on disk, at rest:
 
 | Path                                    | Secret? | Git? | Purpose                                    |
 |-----------------------------------------|---------|------|--------------------------------------------|
-| `.envrc`                                | No      | Yes  | direnv shim — decryption logic only        |
-| `.envrc.enc`                            | Yes     | No   | age-encrypted dotenv (per-developer)       |
-| `apps/mcp-server/.dev.vars`         | Yes     | No   | wrangler dev local env (`MCP_BEARER_TOKEN=dev`; no `CLERK_*` — OAuth is prod-only) |
-| `apps/mcp-server/.dev.vars.example` | No      | Yes  | template                                   |
-| `packages/dev-tools/src/secrets.config.ts` | No   | Yes  | declarative list of secrets + op refs      |
-| 1Password `gc-erp`                      | Yes     | —    | source of truth — holds `MCP_BEARER_TOKEN` (local-dev convenience) + `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` (prod-only) + Cloudflare creds |
+| `.env.local`                            | Yes     | No   | dotenvx-encrypted dotenv (per-developer)   |
+| `.env.keys`                             | Yes     | No   | dotenvx private key (per-developer)        |
+| `apps/mcp-server/wrangler.jsonc`        | No      | Yes  | committed; holds public local-dev `vars: { MCP_BEARER_TOKEN: "dev" }` |
 | Cloudflare secret storage               | Yes     | —    | production runtime env — `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY`; no `MCP_BEARER_TOKEN` in prod |
 
 ---
@@ -213,9 +205,11 @@ Files on disk, at rest:
 ## 5. Deployment
 
 ```
-developer shell (env vars loaded via direnv)
+developer shell (no shell-level secrets — per ADR 0015)
        │
-       │  turbo run deploy   ← globalPassThroughEnv forwards the auth vars
+       │  bunx dotenvx run -f .env.local -- turbo run deploy
+       │       ↓ injects CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID into the turbo subprocess
+       │       ↓ globalPassThroughEnv forwards the vars to wrangler
        ▼
 wrangler → reads wrangler.jsonc (account_id pin refuses non-matching CLOUDFLARE_ACCOUNT_ID)
            uploads Worker script (src/index.ts, compiled)
@@ -237,13 +231,13 @@ What runs when and why, top to bottom:
 
 ### pre-commit (local, fast)
 
-| Check          | Mechanism                     | Purpose                                         |
-|----------------|-------------------------------|-------------------------------------------------|
-| lint           | `turbo run lint` (biome)      | catch style + common bugs                       |
-| typecheck      | `turbo run typecheck` (tsc)   | catch type regressions                          |
-| code-health    | `cs check` on staged files    | reject files with CodeScene health score < 10  |
+| Check          | Mechanism                                                                              | Purpose                                                                  |
+|----------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| lint           | `turbo run lint` (biome)                                                               | catch style + common bugs                                                |
+| typecheck      | `turbo run typecheck` (tsc)                                                            | catch type regressions                                                   |
+| code-health    | `for f in <staged>; do bash scripts/codescene.sh gate-check "$f"; done`                | reject any staged TS/JS file with CodeScene health score < 10 (no exclusions — tests + dev-tools included) |
 
-Lint + typecheck run in parallel. Code-health skips with a visible warning if `cs` CLI isn't installed — we do not want to block contributors who haven't set up CodeScene, but the signal being off must be loud.
+Lint + typecheck run in parallel. Code-health runs sequentially file-by-file (parallel `cs` invocations from inside lefthook + Bun.spawn deadlocked in earlier attempts — see [`scripts/codescene.sh`](../../scripts/codescene.sh)). The bash wrapper sources `CS_ACCESS_TOKEN` from `.env.local` via `bunx dotenvx get` and `export`s it, so `cs` inherits the token through the native environ. Hard-fails if the `cs` CLI is missing or `CS_ACCESS_TOKEN` is unset — there's no graceful skip. Get a CodeScene seat and put the token in `.env.local` (`bunx dotenvx set CS_ACCESS_TOKEN <value> -f .env.local`).
 
 ### commit-msg
 
@@ -255,12 +249,13 @@ Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`
 
 ### pre-push (local, thorough)
 
-| Check           | Mechanism                                                   | Purpose                                         |
-|-----------------|-------------------------------------------------------------|-------------------------------------------------|
-| full gate       | `bun run gate -- --coverage`                                | typecheck + lint + test w/ coverage + cs        |
-| vulnerability   | `osv-scanner scan --config ... --lockfile=bun.lock`         | catch known CVEs in dependencies                |
+| Check           | Mechanism                                                                                         | Purpose                                                                  |
+|-----------------|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| full gate       | `bun run gate -- --coverage`                                                                      | typecheck + lint + test w/ coverage                                      |
+| vulnerability   | `osv-scanner scan --config ... --lockfile=bun.lock`                                               | catch known CVEs in dependencies                                         |
+| code-health     | `git diff origin/main...HEAD ... \| xargs -I{} bash scripts/codescene.sh gate-check {}`           | every TS/JS file modified on this branch (vs `origin/main`; tests + dev-tools included) must score 10 |
 
-`bun run gate` dispatches to `packages/dev-tools/src/gate/` which runs each check as a subprocess, collects results, and prints a pass/fail summary. Coverage thresholds are `lines: 90` overall / `lines: 70` per file, configured in each package's `vitest.config.ts`.
+`bun run gate` dispatches to [`packages/dev-tools/src/gate/`](../../packages/dev-tools/src/gate/) which runs each check as a subprocess, collects results, and prints a pass/fail summary. Coverage thresholds are `lines: 90` overall / `lines: 70` per file, configured in each package's `vitest.config.ts`. Code-health is its own pre-push hook — kept off the bun-driven gate path to avoid the parallel-cs-spawn deadlock (per ADR 0015 + [`scripts/codescene.sh`](../../scripts/codescene.sh)).
 
 ### CI (GitHub Actions)
 
@@ -295,9 +290,7 @@ Fast local checks fail loudly at the moment of authorship. Expensive checks move
 | **Lefthook**        | git hook manager       | fast, parallel, self-installs via `prepare` script                           |
 | **OSV-Scanner**     | supply-chain scan      | checks bun.lock against Google's OSV database on every push                  |
 | **CodeScene `cs`**  | code-health gate       | per-file score ≥ 10 requirement catches complexity regressions at authoring time |
-| **age**             | local encryption       | no network, no key server; encrypt `.envrc.enc` to own pubkey                |
-| **direnv**          | shell env per-dir      | auto-load on `cd` removes the "did I source .env?" failure mode              |
-| **1Password CLI**   | secret retrieval       | `op read` feeds `sync-secrets`; shared vault is team source of truth         |
+| **dotenvx**         | per-process secrets    | encrypted `.env.local` per developer (ADR 0015); `bunx dotenvx run` injects env into one subprocess and exits — parent shell never holds plaintext |
 
 ---
 
@@ -326,6 +319,6 @@ Concrete starting points by task:
 - **"I want to know what it *does*."** → [SPEC.md](../../SPEC.md) → Narrative walkthrough.
 - **"I want to change what a tool returns."** → `apps/mcp-server/src/index.ts` → `GcErpMcp.init()`.
 - **"I want to change the data model."** → [SPEC.md §1](../../SPEC.md) → `packages/database/src/schema/` (Zod + drizzle colocated per entity).
-- **"I want to add a new secret."** → `packages/dev-tools/src/secrets.config.ts`; add to 1Password vault; `turbo run sync-secrets`.
+- **"I want to add a new secret."** → `bunx dotenvx set NAME VAL -f .env.local` (per ADR 0015). If a turbo task's child needs to see it, also add the name to `globalPassThroughEnv` in `turbo.json`.
 - **"I want to add a new quality check."** → `packages/dev-tools/src/gate/checks.ts` and/or `lefthook.yml`.
 - **"The gate is failing and I don't know why."** → `bun run gate` at the repo root prints the output directly; per-check exit codes indicate the failure.

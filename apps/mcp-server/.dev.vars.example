@@ -1,6 +1,0 @@
-# Copy to .dev.vars for `wrangler dev` local runs. `turbo run sync-secrets`
-# will overwrite .dev.vars with the same MCP_BEARER_TOKEN=dev (sourced from
-# localDevVars in packages/dev-tools/src/secrets.config.ts).
-#
-# Prod does not use a bearer — it uses Clerk OAuth (see ADR 0012).
-MCP_BEARER_TOKEN=dev

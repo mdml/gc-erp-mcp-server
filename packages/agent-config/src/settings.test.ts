@@ -73,17 +73,13 @@ describe("composeSettings", () => {
     expect(s.permissions.deny).toContain("Bash(bun run infra:teardown*)");
   });
 
-  it("denies direct op/age usage", () => {
-    const s = composeSettings();
-    expect(s.permissions.deny).toContain("Bash(op read*)");
-    expect(s.permissions.deny).toContain("Bash(age -d*)");
-  });
-
   it("denies secret-file reads", () => {
     const s = composeSettings();
-    expect(s.permissions.deny).toContain("Bash(cat .envrc.enc*)");
-    expect(s.permissions.deny).toContain("Bash(cat .dev.vars*)");
+    // The broad `cat .env*` covers .env.local (dotenvx body) + .env.keys
+    // (private key). See ADR 0015.
+    expect(s.permissions.deny).toContain("Bash(cat .env*)");
     expect(s.permissions.deny).toContain("Bash(printenv*)");
+    expect(s.permissions.deny).toContain("Bash(env)");
   });
 
   it("dedupes pattern lists even if policy accidentally repeats one", () => {
