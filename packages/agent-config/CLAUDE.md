@@ -35,7 +35,7 @@ For the user-facing cheat sheet of command shapes that auto-allow, see [root CLA
 
 - **`.claude/` is a build output.** Never hand-edit `.claude/settings.json`; regenerate from this package. There is no `settings.local.json` escape hatch — if you need a new permission, send a PR.
 - **`install.ts` never preserves prior `.claude/` contents.** It overwrites `settings.json` and deletes `settings.local.json` if present. Drift prevention is achieved by the fact that the regeneration step is part of `prepare` (runs on every `bun install`) and `post-checkout`.
-- **Atomic writes.** `settings.json` is temp-file + rename, mirroring `sync-secrets`' approach for `.envrc.enc`. A crash mid-write never leaves Claude Code reading half a file.
+- **Atomic writes.** `settings.json` is temp-file + rename. A crash mid-write never leaves Claude Code reading half a file.
 - **No cross-package imports into `agent-config`.** The runtime (`mcp-server`) must not import from here; this is a tooling package and installs its config once, then gets out of the way.
 - **Policy changes are team decisions, not per-dev.** The whole point of deleting `settings.local.json` is to force permission drift into a PR. Resist the temptation to reintroduce per-developer overrides without a broader design conversation.
 

@@ -38,23 +38,13 @@ export const bashDeny: readonly string[] = [
   "Bash(git worktree remove*)",
 
   // Secret readers (on-disk material or exfil primitives).
-  "Bash(cat .envrc.enc*)",
-  "Bash(cat .dev.vars*)",
+  // `.env*` covers both .env.local (dotenvx body) and .env.keys (private key).
   "Bash(cat .env*)",
-  "Bash(cat *keys.txt*)",
-  "Bash(cat ~/.config/sops/*)",
   "Bash(cat ~/.ssh/*)",
   "Bash(cat ~/.aws/*)",
   "Bash(printenv*)",
   "Bash(env)",
   "Bash(env *)",
-
-  // Direct 1Password / age. Sync-secrets is the only sanctioned surface.
-  "Bash(op read*)",
-  "Bash(op item get*)",
-  "Bash(op signin*)",
-  "Bash(age -d*)",
-  "Bash(age --decrypt*)",
 
   // Token leakers.
   "Bash(gh auth token*)",

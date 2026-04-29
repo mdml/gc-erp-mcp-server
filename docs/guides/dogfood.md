@@ -10,7 +10,7 @@ Two targets exist; all tooling is aware of both.
 | **URL** | `http://localhost:8787/mcp` | `https://gc.leiserson.me/mcp` |
 | **Runtime** | `wrangler dev` (hot-reload) | Deployed Cloudflare Worker |
 | **Database** | Local D1 file — `.wrangler/state/v3/d1/` | Live D1 (`gc-erp`) in Cloudflare |
-| **Auth** | Static bearer — `MCP_BEARER_TOKEN=dev` from `.dev.vars` | **OAuth 2.1 + DCR via Clerk** (hosted consent — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)) |
+| **Auth** | Static bearer — `MCP_BEARER_TOKEN=dev` from `wrangler.jsonc` `vars` | **OAuth 2.1 + DCR via Clerk** (hosted consent — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md)) |
 | **Cost to touch** | Free — no real data at risk | Real data; writes are permanent |
 | **When to use** | Tool development, scenario runs, iteration | Actual GC work, dogfood sessions, client config |
 
@@ -21,7 +21,7 @@ Local is cheap and resettable. Prod is where the job history lives.
 
 The two targets use different auth mechanisms on purpose — see [ADR 0012](../decisions/0012-clerk-for-prod-mcp-oauth.md) for the full rationale.
 
-- **Local:** static `Authorization: Bearer dev` header. The token `dev` is hardcoded in `.dev.vars`; not a real secret; never rotated. `wrangler dev` loads `.dev.vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `apps/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
+- **Local:** static `Authorization: Bearer dev` header. The token `dev` is a public literal baked into committed `apps/mcp-server/wrangler.jsonc` `vars` (per [ADR 0015](../decisions/0015-dotenvx-secrets-management.md)); not a real secret; never rotated. `wrangler dev` reads `vars` automatically. `install:mcp:local` writes the header directly into the Desktop config — no secret lookup, nothing sensitive in the file. The constant-time bearer compare (`timingSafeEqual` in `apps/mcp-server/src/auth.ts`) runs only when `env.CLERK_SECRET_KEY` is unset.
 - **Prod:** OAuth 2.1 with Dynamic Client Registration. The Worker proxies Clerk's `/.well-known/oauth-authorization-server` discovery doc (pointing clients at Clerk's hosted `/oauth/authorize`, `/oauth/token`, `/oauth/register`) and serves its own Clerk-shaped `/.well-known/oauth-protected-resource` metadata. MCP clients (Claude Desktop and claude.ai alike) fetch the metadata, register themselves via DCR, **redirect through Clerk's hosted consent page** (Clerk hosts the sign-in + scope approval UI — the Worker never renders one), and receive a Clerk-minted access token. The Worker validates that JWT on every `/mcp*` request via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; tool handlers read `userId` / `scopes` / `clientId` via `getMcpAuthContext().auth`.
 
 **Why the split:** claude.ai Custom Connectors on web + iOS + Android reject static bearer headers — they implement the MCP OAuth spec strictly. Claude Desktop historically accepted bearer headers, but with OAuth available it should use OAuth too (cleaner, per-user identity, works across all Claude surfaces). Local stays on bearer because the scenario runner is server-to-server and OAuth'ing every script invocation adds setup cost for no real security benefit — local D1 has no real data.
@@ -156,7 +156,7 @@ The entry it writes:
 }
 ```
 
-The token `dev` is the fixed local value from `.dev.vars`. It is not a secret — nothing in local D1 warrants protection.
+The token `dev` is the fixed local literal in `apps/mcp-server/wrangler.jsonc` `vars`. It is not a secret — nothing in local D1 warrants protection.
 
 > **Why `mcp-remote` and not `type: "http"`?** Claude Desktop's `claude_desktop_config.json` only accepts stdio entries today; entries with `type: "http"` (or similar streaming-transport shapes) are rejected as "not a valid MCP server configuration" at Desktop startup. We bridge via the `mcp-remote` npm package, which spawns a local stdio proxy that forwards to our HTTP server with the bearer header attached. The space-less `Authorization:${AUTH_HEADER}` + `AUTH_HEADER: "Bearer dev"` env split works around a Claude-Desktop-on-Windows spaces-in-args bug noted in [mcp-remote's readme](https://github.com/geelen/mcp-remote#readme) — Mac tolerates the space-ful form, but the env-split shape is portable.
 
@@ -187,7 +187,8 @@ The web interface at claude.ai supports the same connector configuration under P
 
 ```bash
 bun install                         # resolve workspaces
-direnv allow                        # load .envrc.enc → MCP_BEARER_TOKEN + CF creds
+# Per-developer secrets live in `.env.local` via dotenvx (see README §First-time setup).
+# `wrangler dev` doesn't need them — MCP_BEARER_TOKEN=dev comes from wrangler.jsonc vars.
 bun run dev                         # start wrangler dev (pane A)
 bun run db:migrate:local            # apply migrations to local D1
 bun run db:seed:activities:local    # seed the 22-activity library (optional but useful)

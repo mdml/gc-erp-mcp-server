@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync-secrets": "bun run src/sync-secrets.ts",
     "gate": "bun run src/gate.ts",
-    "code-health": "bun run src/code-health.ts",
     "scenario": "bun run src/scenarios/run.ts",
     "scenario:reset": "bun run src/scenarios/reset-cli.ts",
     "db:migrate:local": "bun run src/db/migrate.ts local",

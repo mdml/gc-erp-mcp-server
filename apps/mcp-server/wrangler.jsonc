@@ -20,6 +20,14 @@
   "observability": {
     "enabled": true
   },
+  // Local dev only. The bearer is a fixed public literal; Worker auth selects on
+  // CLERK_SECRET_KEY presence (prod) vs. absence (local). Supplying it here means
+  // `wrangler dev` doesn't need a `.dev.vars` file — per ADR 0015's per-process
+  // secrets model, real secrets stay encrypted in `.env.local` and only enter
+  // process env via `bunx dotenvx run`.
+  "vars": {
+    "MCP_BEARER_TOKEN": "dev"
+  },
   "durable_objects": {
     "bindings": [{ "name": "MCP_OBJECT", "class_name": "GcErpMcp" }]
   },

@@ -17,8 +17,7 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "gate": "bun run --cwd packages/dev-tools gate",
-    "code-health": "bun run --cwd packages/dev-tools code-health",
-    "sync-secrets": "turbo run sync-secrets --filter=@gc-erp/dev-tools",
+    "code-health": "bash scripts/codescene.sh gate-all",
     "scenario": "bun run --cwd packages/dev-tools scenario",
     "scenario:reset": "bun run --cwd packages/dev-tools scenario:reset",
     "db:migrate:local": "bun run --cwd packages/dev-tools db:migrate:local",
@@ -41,6 +40,7 @@
     "@commitlint/cli": "20.5.0",
     "@commitlint/config-conventional": "20.5.0",
     "@commitlint/types": "20.5.0",
+    "@dotenvx/dotenvx": "1.61.1",
     "lefthook": "2.1.5",
     "turbo": "^2.0.0"
   }
