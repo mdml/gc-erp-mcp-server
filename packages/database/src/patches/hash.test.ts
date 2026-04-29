@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IsoDate } from "../schema/common";
 import type { CommitmentId, JobId, PatchId } from "../schema/ids";
 import type { CommitmentEdit } from "../schema/patches";
-import { patchIdFor } from "./hash";
+import { type PatchHashInput, patchIdFor } from "./hash";
 
 const voidEdit: CommitmentEdit = {
   op: "void",
@@ -13,53 +13,42 @@ const voidEdit: CommitmentEdit = {
 const jobId = "job_k" as JobId;
 const createdAt = "2026-04-18T12:00:00Z" as IsoDate;
 
+// `hashWith` builds a `patchIdFor` input from a baseline (jobId, [voidEdit],
+// createdAt) plus optional overrides — collapses the duplicated envelope
+// shape across the "differs when X changes" tests.
+const hashWith = (overrides: Partial<PatchHashInput> = {}) =>
+  patchIdFor({ jobId, edits: [voidEdit], createdAt, ...overrides });
+
 describe("patchIdFor", () => {
   it("returns a deterministic pat_<64 hex chars>", async () => {
-    const id = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
+    const id = await hashWith();
     expect(id).toMatch(/^pat_[0-9a-f]{64}$/);
 
-    const again = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
+    const again = await hashWith();
     expect(again).toBe(id);
   });
 
   it("differs when parentPatchId changes", async () => {
-    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
-    const b = await patchIdFor({
-      jobId,
-      parentPatchId: "pat_parent" as PatchId,
-      edits: [voidEdit],
-      createdAt,
-    });
+    const a = await hashWith();
+    const b = await hashWith({ parentPatchId: "pat_parent" as PatchId });
     expect(a).not.toBe(b);
   });
 
   it("differs when edits change", async () => {
-    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
-    const b = await patchIdFor({
-      jobId,
-      edits: [{ ...voidEdit, reason: "different" }],
-      createdAt,
-    });
+    const a = await hashWith();
+    const b = await hashWith({ edits: [{ ...voidEdit, reason: "different" }] });
     expect(a).not.toBe(b);
   });
 
   it("differs when createdAt changes", async () => {
-    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
-    const b = await patchIdFor({
-      jobId,
-      edits: [voidEdit],
-      createdAt: "2026-04-18T12:00:01Z" as IsoDate,
-    });
+    const a = await hashWith();
+    const b = await hashWith({ createdAt: "2026-04-18T12:00:01Z" as IsoDate });
     expect(a).not.toBe(b);
   });
 
   it("differs when jobId changes (F2.1)", async () => {
-    const a = await patchIdFor({ jobId, edits: [voidEdit], createdAt });
-    const b = await patchIdFor({
-      jobId: "job_other" as JobId,
-      edits: [voidEdit],
-      createdAt,
-    });
+    const a = await hashWith();
+    const b = await hashWith({ jobId: "job_other" as JobId });
     expect(a).not.toBe(b);
   });
 

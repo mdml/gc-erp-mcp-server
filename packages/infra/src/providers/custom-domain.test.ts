@@ -133,6 +133,17 @@ describe("teardownCustomDomain", () => {
     cfMock.mockReset();
   });
 
+  async function expectTeardownDeletes(existing: WorkerDomain): Promise<void> {
+    cfMock.mockResolvedValueOnce([existing]).mockResolvedValueOnce(undefined);
+    const r = await teardownCustomDomain(cfg);
+    expect(r).toBe("detached");
+    expect(cfMock).toHaveBeenNthCalledWith(
+      2,
+      "DELETE",
+      `/accounts/acct-test/workers/domains/${existing.id}`,
+    );
+  }
+
   it("returns not-found when nothing is attached", async () => {
     cfMock.mockResolvedValueOnce([]);
     const r = await teardownCustomDomain(cfg);
@@ -140,30 +151,12 @@ describe("teardownCustomDomain", () => {
   });
 
   it("deletes the existing domain by id and returns detached", async () => {
-    cfMock
-      .mockResolvedValueOnce([domain({ id: "dom-xyz" })])
-      .mockResolvedValueOnce(undefined);
-    const r = await teardownCustomDomain(cfg);
-    expect(r).toBe("detached");
-    expect(cfMock).toHaveBeenNthCalledWith(
-      2,
-      "DELETE",
-      "/accounts/acct-test/workers/domains/dom-xyz",
-    );
+    await expectTeardownDeletes(domain({ id: "dom-xyz" }));
   });
 
   it("detaches even when the hostname is drifted to another service", async () => {
-    cfMock
-      .mockResolvedValueOnce([
-        domain({ id: "dom-drift", service: "other-worker" }),
-      ])
-      .mockResolvedValueOnce(undefined);
-    const r = await teardownCustomDomain(cfg);
-    expect(r).toBe("detached");
-    expect(cfMock).toHaveBeenNthCalledWith(
-      2,
-      "DELETE",
-      "/accounts/acct-test/workers/domains/dom-drift",
+    await expectTeardownDeletes(
+      domain({ id: "dom-drift", service: "other-worker" }),
     );
   });
 });
