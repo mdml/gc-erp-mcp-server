@@ -1,0 +1,29 @@
+# Codex CLI config for gc-erp-mcp-server.
+# See docs/guides/codex.md for design rationale.
+#
+# IMPORTANT: this file does NOT load until the user accepts the trust
+# prompt on Codex's first run in this repo. Verify the policy is in
+# effect after trusting with `codex execpolicy check '<some command>'`.
+
+# Coarse approval gates. Fine-grained allow / forbid lives in
+# rules/policy.star.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# MCP servers — mirrors .mcp.json + .claude/settings.json's
+# `enabledMcpjsonServers`. Same servers, different config shape.
+
+[mcp_servers.codescene]
+command = "npx"
+args = ["@codescene/codehealth-mcp"]
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+
+# Hooks — fire scripts/bootstrap.sh on session start to match Zed's
+# create_worktree task (.zed/tasks.json) and Claude Code's SessionStart
+# hook (.claude/settings.json). Three launch paths, one script.
+
+[hooks.SessionStart]
+command = "bash scripts/bootstrap.sh"
