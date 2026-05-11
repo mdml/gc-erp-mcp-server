@@ -13,12 +13,12 @@ Foundation lands first because the new Rust stack is where every product scope (
 
 ## In
 
-**Portability slice** (per [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md)):
+**Portability slice** (per [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md), amended 2026-05-11):
 
 - Justfile at root with `just check`, `just test`, `just bootstrap`, `just deploy` recipes wrapping current `bun` / `turbo` invocations
-- AGENTS.md symlinked to CLAUDE.md (Codex reads AGENTS.md by convention)
-- Zed configured for multi-agent operation; setup captured in `docs/guides/zed-multi-agent.md`
-- `packages/agent-config` deleted; `bun install` hook removed; per-harness permission surfaces handled at the harness layer against `Bash(just *)` allow
+- `AGENTS.md` as canonical project-context file (vendor-neutral filename); `CLAUDE.md` is a thin `@AGENTS.md` import + any Claude-Code-specific notes. Same pattern per package.
+- `.zed/tasks.json` with `create_worktree` hook → `scripts/bootstrap.sh` (idempotent; copies env files, installs deps). Same script wired into the `claude --worktree` flow via `.worktreeinclude` + a SessionStart hook. Zed-as-agent-host framing captured in `docs/guides/zed.md`.
+- `packages/agent-config` deleted; `bun install` hook removed; per-harness permission surfaces hand-maintained: narrow `.claude/settings.json` for Claude Code; `.codex/config.toml` + Starlark `.codex/rules/*.star` for Codex (per Codex's `prefix_rule` grammar). Codex specifics + the trust-gate footgun captured in `docs/guides/codex.md`.
 
 **Secrets handling** (continues [ADR 0015 — dotenvx](../../decisions/0015-dotenvx-secrets-management.md)):
 
@@ -59,14 +59,14 @@ These resolve during the foundation work, mostly via the P1 POC + an ADR each:
 
 **Foundation ships in two slices that can run in either order or partially in parallel:**
 
-### Slice A — Portability layer (per [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md))
+### Slice A — Portability layer (per [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md), amended 2026-05-11)
 
-Ships first. Lower risk, smaller scope, validates multi-harness flow before there's a Rust port to drive through it.
+Ships first. Lower risk, smaller scope, validates multi-harness flow before there's a Rust port to drive through it. Four sub-steps, ordered lowest-risk first; one PR (`feat/portability-layer`).
 
-1. Justfile at root with the verb surface (`just check`, `just test`, `just bootstrap`, `just deploy`, plus a `default` recipe running `just --list`).
-2. AGENTS.md symlinked to CLAUDE.md.
-3. Zed configured for Claude Code + Codex; setup notes in `docs/guides/zed-multi-agent.md`.
-4. Sunset `packages/agent-config` — delete the package, remove the `bun install` hook, narrow `.claude/settings.json` to a small hand-maintained file.
+1. **Justfile at root** with the verb surface (`just check`, `just test`, `just bootstrap`, `just deploy`, plus a `default` recipe running `just --list`). Recipes wrap current `bun` / `turbo` invocations; dotenvx is the inner wrap on any recipe that touches a secret. Rust recipes added at P1.
+2. **`AGENTS.md` as canonical project-context file.** Rename each `CLAUDE.md` → `AGENTS.md` (root + per-package). Replace each `CLAUDE.md` with a thin `@AGENTS.md` import plus any peeled-off Claude-Code-specific content (e.g. the root's "Agent auto-allow — command shapes" section, which documents `.claude/settings.json` shape).
+3. **Zed task glue + worktree bootstrap script.** `.zed/tasks.json` with `create_worktree` hook → `scripts/bootstrap.sh` (idempotent: copies `.env.local`/`.env.keys` if `BOOTSTRAP_ENV_SOURCE` / `ZED_MAIN_GIT_WORKTREE` set, runs `bun install`, fast-paths out if `node_modules` exists). Same script wired into `claude --worktree` via existing `.worktreeinclude` + a SessionStart hook. `docs/guides/zed.md` written per the vendor-guide convention (Agent Panel, external agents via ACP, `create_worktree` task hook, "we don't use Zed Agent thread type" boundary).
+4. **Sunset `packages/agent-config` + add Codex permission surface.** Delete the package; remove the `bun install` hook from `package.json`'s `prepare` script; narrow `.claude/settings.json` to a small hand-maintained file lifting current allow/deny verbatim. Add `.codex/config.toml` (with `approval_policy`, `sandbox_mode`, `[mcp_servers.*]`) and `.codex/rules/*.star` (Starlark `prefix_rule` translations of the Claude allowlist). `docs/guides/codex.md` written per the vendor-guide convention, including the trust-gate footgun (repo-local `.codex/config.toml` does not load until the user accepts the trust prompt on first run).
 
 PR shape: one slice (`feat/portability-layer`).
 
