@@ -1,12 +1,12 @@
-# CLAUDE.md — packages/
+# AGENTS.md — packages/
 
 Conventions for workspace packages under `packages/`.
 
-> **Every package (under `packages/`) and every app (under `apps/`) has its own `CLAUDE.md`.** Package-scoped instructions beat project-wide ones because Claude Code loads the nearest CLAUDE.md for any file it touches. When you create a new package or app, creating its CLAUDE.md is part of the checklist — not a later polish step. The `apps/*` vs `packages/*` split is per [ADR 0013](../docs/decisions/0013-apps-layout-convention.md) — `apps/*` holds user-facing shipping units (the Worker and its UI bundles); `packages/*` holds internal libraries.
+> **Every package (under `packages/`) and every app (under `apps/`) has its own `AGENTS.md`** (with a thin `CLAUDE.md` stub importing it). Package-scoped instructions beat project-wide ones because Claude Code loads the nearest context file for any file it touches. When you create a new package or app, creating its `AGENTS.md` is part of the checklist — not a later polish step. The `apps/*` vs `packages/*` split is per [ADR 0013](../docs/decisions/0013-apps-layout-convention.md) — `apps/*` holds user-facing shipping units (the Worker and its UI bundles); `packages/*` holds internal libraries.
 
 ## Naming
 
-Package names are **scope nouns or noun-phrases** (`mcp-server`, `dev-tools`, `infra`, `agent-config`) — what the package *is*, not what kind of thing it is. Role words (`lib`, `utils`, `common`, `shared`, `core`) are wrong: they describe a category, not a scope, and tend to grow into dumping grounds. If you can't name a package in one or two words that describe its job, it probably shouldn't be its own package yet.
+Package names are **scope nouns or noun-phrases** (`mcp-server`, `dev-tools`, `infra`, `database`) — what the package *is*, not what kind of thing it is. Role words (`lib`, `utils`, `common`, `shared`, `core`) are wrong: they describe a category, not a scope, and tend to grow into dumping grounds. If you can't name a package in one or two words that describe its job, it probably shouldn't be its own package yet.
 
 ## New package checklist
 
@@ -22,7 +22,7 @@ When creating a new package:
 3. **`vitest.config.ts`** — v8 coverage provider; include `src/**/*.ts`; exclude test files and thin I/O wiring (see below). Thresholds follow the project standard (`lines: 90` / per-file `lines: 70`).
 4. **Devdeps** — `vitest` and `@vitest/coverage-v8` at exactly the same pinned version as other packages (`bunfig.toml` `exact = true`).
 5. **Tests next to source** — `foo.ts` gets `foo.test.ts` in the same directory.
-6. **`CLAUDE.md`** — what this package does, key files, testing approach, any package-specific invariants. Keep it short; link to ARCHITECTURE.md for cross-cutting details.
+6. **`AGENTS.md`** — what this package does, key files, testing approach, any package-specific invariants. Keep it short; link to ARCHITECTURE.md for cross-cutting details. Drop a thin `CLAUDE.md` stub alongside containing just `@AGENTS.md`.
 
 ## Coverage exclusion policy
 
@@ -46,6 +46,6 @@ Avoid heavy mocking of subprocesses or the filesystem just to test orchestration
 Per [ADR 0013](../docs/decisions/0013-apps-layout-convention.md), user-facing shipping units (the Worker, UI bundles) live under `apps/`, not here. Two categories remain under `packages/`:
 
 - **Runtime libraries** — imported into an app's bundle at runtime (`database`). Keep deps lean — every import grows the deployed Worker bundle. No dev-only deps in the runtime-lib's `dependencies`.
-- **Tooling packages** (`dev-tools`, `infra`, `agent-config`) are internal — CLIs, scripts, gate runners, build-time config. They never appear in any runtime bundle. Use Bun APIs (`Bun.spawn`, `Bun.file`) freely.
+- **Tooling packages** (`dev-tools`, `infra`) are internal — CLIs, scripts, gate runners, build-time config. They never appear in any runtime bundle. Use Bun APIs (`Bun.spawn`, `Bun.file`) freely.
 
 If you're unsure which category a new package belongs to, prefer tooling unless there's a clear reason an app's runtime needs it.

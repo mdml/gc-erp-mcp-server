@@ -49,9 +49,6 @@
       "dependsOn": ["^build"],
       "inputs": ["src/**", "vitest.config.ts", "package.json", "tsconfig.json"],
       "outputs": ["coverage/**"]
-    },
-    "install-agent-config": {
-      "cache": false
     }
   }
 }

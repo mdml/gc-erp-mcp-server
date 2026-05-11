@@ -1,4 +1,4 @@
-# CLAUDE.md — gc-erp-mcp-server
+# AGENTS.md — gc-erp-mcp-server
 
 > Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Abstractions](docs/guides/ABSTRACTIONS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scopes](docs/product/scope/) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
 
@@ -14,55 +14,48 @@ For the product pitch → [docs/product/overview.md](docs/product/overview.md). 
 - `packages/database/` — SPEC §1 data layer: Zod + Drizzle schemas, migrations, seeds, typed D1 client; imported by mcp-server
 - `packages/dev-tools/` — internal CLIs for *local* dev env (gate runner, code-health CLI, scenario runner, db helpers); never shipped
 - `packages/infra/` — internal CLI for *remote* Cloudflare provisioning (custom domain, [later] D1/R2/secrets); never shipped
-- `packages/agent-config/` — single source of truth for Claude Code permissions; installs `.claude/settings.json` via `bun install`
 
-Each package has its own `CLAUDE.md` with scope-specific instructions. Read the relevant one before touching a file in that package.
+Each package has its own `AGENTS.md` (with a thin `CLAUDE.md` stub importing it) for scope-specific instructions. Read the relevant one before touching a file in that package.
 
 ## Development
 
 ```bash
-bun install                     # workspaces resolve; in main, `prepare` installs lefthook hooks (skipped in worktrees — they share main's hooks)
+just bootstrap                  # idempotent: install deps + (in fresh Zed worktrees) copy env files
+just check                      # full local gate (lint + typecheck + test + code-health)
+just test                       # vitest across all workspaces
+just deploy                     # deploy Worker (dotenvx-wrapped for CF creds)
+just --list                     # discover all recipes
+
 bunx dotenvx set NAME VAL -f .env.local  # seed secrets (per ADR 0015) — see README for the list
-turbo run dev                   # wrangler dev for the Worker
-turbo run typecheck             # tsc --noEmit across all packages
-turbo run test                  # vitest across all packages
-turbo run lint                  # biome
-bun run gate                    # full local gate (lint + typecheck + test + code-health)
-bun run code-health             # whole-repo CodeScene sanity check (gates on score 10)
-bun run format                  # biome --write at repo root
-bunx dotenvx run -f .env.local -- turbo run deploy   # deploy Worker to Cloudflare
+bun run format                  # biome --write at repo root (one-off; not yet a just recipe)
 ```
+
+`just` is the canonical verb surface ([ADR 0016](docs/decisions/0016-portability-layer-justfile-multi-harness.md)). Direct `bun run …` / `turbo run …` / `bunx dotenvx …` still work for one-offs but won't auto-allow under the agent permission policy — see [Agent auto-allow](#agent-auto-allow--command-shapes).
 
 Secrets are encrypted at rest per-developer via [dotenvx](https://dotenvx.com) — `.env.local` (encrypted body) + `.env.keys` (private key), both gitignored, both per-developer. Decryption is per-process; the parent shell never holds plaintext. See [docs/guides/ARCHITECTURE.md §4](docs/guides/ARCHITECTURE.md) and [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md). Prereqs: `bun`, `lefthook`, `osv-scanner`, `cs` (CodeScene CLI — required: code-health hard-fails without it). `dotenvx` itself is a workspace devDep, resolved via `bunx`.
 
 ### Agent auto-allow — command shapes
 
-These forms run without a permission prompt (policy lives in [packages/agent-config/src/policy/](packages/agent-config/src/policy/)):
+Policy lives in [`.claude/settings.json`](.claude/settings.json) (hand-maintained; tracked in git). The principle: collapse the verb surface through `just`, then allow `Bash(just *)` plus a small fixed set of read-only / safe-write Bash commands.
 
 | Shape | Example | Notes |
 |---|---|---|
-| `bun install …` | `bun install`, `bun install --frozen-lockfile` | |
-| `bun run <anything>` | `bun run gate`, `bun run test`, `bun run --cwd apps/mcp-server test`, `bun run --filter @gc-erp/mcp-server test` | Broad glob. Flag position doesn't matter — `--cwd`, `--filter`, and extra args all match. |
-| `bun pm view/ls/why …` | `bun pm view drizzle-orm time`, `bun pm ls --all`, `bun pm why esbuild` | Read-only: registry metadata + local-graph introspection. No lockfile mutation. |
-| `bunx <tool> …` | `bunx biome check .`, `bunx vitest run`, `bunx tsc --noEmit`, `bunx turbo run test` | Limited to the tools enumerated in `allow.ts` (biome, vitest, commitlint, tsc, turbo). |
-| `turbo run <task> …` | `turbo run test --filter=@gc-erp/mcp-server`, `turbo run typecheck` | Works for every task except `deploy` (denied). |
-| `bunx dotenvx …` | `bunx dotenvx set CS_ACCESS_TOKEN … -f .env.local`, `bunx dotenvx run -f .env.local -- bunx wrangler deploy` | Encrypted-at-rest dotenv loader (ADR 0015). `set`/`get`/`run` all auto-allow; downstream commands inside `dotenvx run` hit their own allow/deny rules. |
-| `bash scripts/codescene.sh …` | `bash scripts/codescene.sh gate-check src/foo.ts`, `bash scripts/codescene.sh gate-all` | Bash wrapper around `cs` (per ADR 0015). `gate-check <file>` scores one file (used by lefthook pre-commit + pre-push); `gate-all` scores the whole repo (used by `bun run code-health`). |
-| `git fetch …` | `git fetch`, `git fetch origin feat/m1-data-model` | Updates remote-tracking refs only; no working-tree mutation. |
-| `git merge --ff-only …` | `git merge --ff-only origin/feat/m1-data-model` | Fast-forward only — refuses if non-FF, so it can't discard local commits. Safe alternative to `git reset --hard` for base-ref alignment. |
+| `just <recipe>` | `just check`, `just test`, `just deploy`, `just bootstrap` | The primary verb surface. `just --list` to discover. |
+| `git <read-only>` | `git status`, `git diff`, `git log`, `git show`, `git fetch`, `git branch`, `git blame`, `git rev-parse`, `git ls-files`, `git worktree list`, `git remote -v` | Read-only inspection. |
+| `git <local-write>` | `git add`, `git commit -m`, `git switch`, `git checkout -b`, `git stash`, `git restore --staged`, `git mv`, `git rm` | Local-only writes. |
 | `git push origin <prefix>/*` | `git push origin slice/3-infra`, `git push -u origin feat/foo` | Conventional-commit prefixes only. Bare `git push` and pushes to `main` stay ASK. |
-| `gh pr view/create/comment/edit/ready` | `gh pr create --title …`, `gh pr view 42` | Full list in `allow.ts`. |
-| `mkdir -p …` | `mkdir -p packages/database/src/schema` | Scaffolding dirs. Empty-dir creation is reversible; `rm -rf` stays deny. |
-| `diff …` | `diff .scratch/pr35.diff .scratch/pr35-v2.diff` | Read-only compare. Pair with `.scratch/` paths, not `/tmp/` — see [Agent conventions](#agent-conventions). |
+| `git merge --ff-only …` | `git merge --ff-only origin/feat/m1-data-model` | Fast-forward only — refuses if non-FF. Safe alternative to `git reset --hard`. |
+| `gh pr <verb>` | `gh pr view 42`, `gh pr create --title …`, `gh pr diff 42` | Full list in `.claude/settings.json`. Read-only + safe-write subcommands; bare `gh pr merge` stays ASK. |
+| `bun pm view/ls/why` | `bun pm view drizzle-orm time`, `bun pm why esbuild` | Read-only registry + local-graph introspection. No lockfile mutation. |
+| `ls`, `tree`, `mkdir -p`, `diff`, `jq`, `yq`, `wc`, `pwd` | `ls packages/database/src`, `mkdir -p .scratch/foo` | Read-only inspection + safe scaffolding. |
 
 What **never** auto-runs (by deny):
 
-- `bun run deploy`, `bun run infra:apply`, `bun run infra:teardown` — production surfaces.
-- `turbo run deploy`, `wrangler deploy`, `wrangler secret …`, `wrangler login`.
-- `git push --force` (any variant), `git reset --hard`, `git branch -D`, `rm -rf …`.
+- Production surfaces: `bun run deploy`, `bun run infra:apply`, `bun run infra:teardown`, `turbo run deploy`, `wrangler deploy`, `wrangler secret …`, `wrangler login`.
+- Destructive: `git push --force` (any variant), `git reset --hard`, `git branch -D`, `rm -rf …`, `git clean -f*`, `git filter-branch`, `git filter-repo`.
 - Secret readers: `cat .env.local`, `cat .env.keys`, `cat .env*` (broad), `printenv`, `env`, `gh auth token`.
 
-To change what auto-allows or denies, edit [packages/agent-config/src/policy/](packages/agent-config/src/policy/) — never hand-edit `.claude/settings.json` (it's a regenerated build output). See [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md).
+To change what auto-allows or denies, edit [`.claude/settings.json`](.claude/settings.json) directly — it's hand-maintained per [ADR 0016 Slice A.4](docs/decisions/0016-portability-layer-justfile-multi-harness.md). Codex's equivalent lives in [`.codex/config.toml`](.codex/config.toml) + [`.codex/rules/`](.codex/rules/) (Starlark `prefix_rule` grammar — see [docs/guides/codex.md](docs/guides/codex.md)). Each harness manages its own permission surface; we don't render from a single source.
 
 ## Invariants
 
@@ -115,8 +108,9 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 
 ### Agent config
 
-- **`.claude/` is a build output.** It's gitignored and regenerated by `packages/agent-config` on every `bun install`. Never hand-edit `.claude/settings.json`; edit policy in `packages/agent-config/src/policy/*.ts` and commit that. No `settings.local.json` escape hatch.
-- **Permission drift goes through a PR.** Adding an allow/deny pattern is a team decision; surface it rather than patching locally.
+- **`.claude/settings.json` is hand-maintained, tracked in git.** No regenerator. Adding an allow/deny pattern is a deliberate commit. No `settings.local.json` escape hatch.
+- **Codex's equivalent is `.codex/config.toml` + `.codex/rules/*.star`.** Each harness manages its own permission surface — Claude uses JSON globs, Codex uses Starlark `prefix_rule` — and we deliberately don't render both from a meta-policy (per [ADR 0016](docs/decisions/0016-portability-layer-justfile-multi-harness.md)).
+- **Permission drift goes through a PR.** Both harnesses' files are tracked; surface a permission change rather than patching locally.
 
 ### Secrets
 
@@ -139,7 +133,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 - **Two different "worktree agent" things — don't conflate them.**
   - **`claude --worktree <name>`** (CLI command, human-launched) — starts a fresh full Claude Code session in a new worktree, with the same tool surface as a normal session (Write, Edit, Bash, etc.). This is the canonical pattern for "spawn a parallel agent to ship a feature" → it opens a PR back to the feature branch when done. Default for parallel work.
   - **`Agent` tool with `isolation: "worktree"`** (in-conversation subagent) — a sandboxed subagent in a temporary worktree. Observed (2026-04-17) to deny the `Write` tool, so it can't scaffold new files. Appropriate for read/research/analysis tasks where you want to keep the main checkout clean, **not** for shipping new code. If you reach for the Agent tool to "implement feature X in parallel," you almost certainly want `claude --worktree` instead.
-- **`claude --worktree` branches from `origin/HEAD`, not your current local branch.** The new worktree checks out `worktree-<name>` based on `origin/HEAD` (typically `origin/main`) regardless of what branch the human was on when they ran it. There is no CLI flag to override. In practice the human usually launched the worktree to continue work on a local feature branch (`slice/N-foo`, `feat/…`) — confirm the intended base before committing. Typical remediation once the human names the branch: `git fetch origin <branch> && git checkout -b <sub-branch> origin/<branch>` (both auto-allowed; settings.json is in [.worktreeinclude](.worktreeinclude) so the policy is in place at session-start). If the worktree's `worktree-<name>` branch already has local commits on top of the wrong base, fall back to `git merge --ff-only origin/<branch>` (auto-allowed; cleanly fast-forwards when there's no divergence, fails loudly when there is) or `git merge origin/<branch>` (plain merge isn't auto-allowed; expect a permission prompt). Caveat: the human's local branch may have unpushed commits that `origin/<branch>` doesn't have — if so, ask them to `git push` first, or confirm they're fine continuing from the remote tip. Worktree first-run plumbing (secret copy, agent-config copy, bootstrap) is handled by [.worktreeinclude](.worktreeinclude) + [packages/agent-config/src/bootstrap.ts](packages/agent-config/src/bootstrap.ts); base-ref alignment is not.
+- **`claude --worktree` branches from `origin/HEAD`, not your current local branch.** The new worktree checks out `worktree-<name>` based on `origin/HEAD` (typically `origin/main`) regardless of what branch the human was on when they ran it. There is no CLI flag to override. In practice the human usually launched the worktree to continue work on a local feature branch (`slice/N-foo`, `feat/…`) — confirm the intended base before committing. Typical remediation once the human names the branch: `git fetch origin <branch> && git checkout -b <sub-branch> origin/<branch>` (both auto-allowed; settings.json is in [.worktreeinclude](.worktreeinclude) so the policy is in place at session-start). If the worktree's `worktree-<name>` branch already has local commits on top of the wrong base, fall back to `git merge --ff-only origin/<branch>` (auto-allowed; cleanly fast-forwards when there's no divergence, fails loudly when there is) or `git merge origin/<branch>` (plain merge isn't auto-allowed; expect a permission prompt). Caveat: the human's local branch may have unpushed commits that `origin/<branch>` doesn't have — if so, ask them to `git push` first, or confirm they're fine continuing from the remote tip. Worktree first-run plumbing (secret copy, deps install) is handled by [.worktreeinclude](.worktreeinclude) + [scripts/bootstrap.sh](scripts/bootstrap.sh) (wired into lefthook's `post-checkout`, Zed's `create_worktree` task, and Claude Code's `SessionStart` hook); base-ref alignment is not.
 
 ## Session rhythm
 
@@ -160,6 +154,6 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
 - **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/CLAUDE.md) → `src/schema/<entity>.ts`.
 - **"I want to add a new secret."** → `bunx dotenvx set NAME VAL -f .env.local` (per ADR 0015). If it needs to reach a turbo task's child process, also add the name to `globalPassThroughEnv` in [turbo.json](turbo.json).
-- **"I want to change what agents can auto-run."** → [packages/agent-config/CLAUDE.md](packages/agent-config/CLAUDE.md) → `src/policy/{allow,deny,mcp}.ts`.
+- **"I want to change what agents can auto-run."** → [`.claude/settings.json`](.claude/settings.json) (Claude Code) and [`.codex/rules/`](.codex/rules/) + [`.codex/config.toml`](.codex/config.toml) (Codex). Hand-maintained per harness.
 - **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/CLAUDE.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.
 - **"I want to make an architectural decision."** → [docs/decisions/CLAUDE.md](docs/decisions/CLAUDE.md) → copy `0000-template.md`.
