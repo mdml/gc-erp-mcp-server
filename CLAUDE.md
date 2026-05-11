@@ -1,12 +1,12 @@
 # CLAUDE.md — gc-erp-mcp-server
 
-> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Abstractions](docs/guides/ABSTRACTIONS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scope](docs/product/scope.md) · [Milestones](docs/product/milestones.md) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
+> Quick links: [README](README.md) · [SPEC](SPEC.md) · [TOOLS](TOOLS.md) · [Abstractions](docs/guides/ABSTRACTIONS.md) · [Architecture](docs/guides/ARCHITECTURE.md) · [Product overview](docs/product/overview.md) · [Scopes](docs/product/scope/) · [Now](docs/product/now.md) · [Backlog](docs/product/backlog.md) · [Decisions](docs/decisions/) · [Retros](docs/retros/)
 
 ## Project overview
 
 A lightweight GC (general contractor) ERP whose product is an **MCP server**. Two operators (Max + Salman) GC their own projects, ~1–5/year; the server exposes the data model, tools, and MCP "apps" (UI components) that a client like Claude Desktop/web/mobile renders. Dogfood-first, not SaaS.
 
-For the product pitch → [docs/product/overview.md](docs/product/overview.md). For scope → [docs/product/scope.md](docs/product/scope.md). For what IS, system-wise → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md). For the data model → [SPEC.md](SPEC.md).
+For the product pitch → [docs/product/overview.md](docs/product/overview.md). For the prioritized scopes → [docs/product/scope/](docs/product/scope/). For what IS, system-wise → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md). For the data model → [SPEC.md](SPEC.md).
 
 ## Repo shape
 
