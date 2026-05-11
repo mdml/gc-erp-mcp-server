@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "prepare": "if [ -d .git ]; then lefthook install --reset-hooks-path; fi && bun run --cwd packages/agent-config install-agent-config",
+    "prepare": "if [ -d .git ]; then lefthook install --reset-hooks-path; fi",
     "dev": "turbo run dev --filter=@gc-erp/mcp-server",
     "deploy": "turbo run deploy --filter=@gc-erp/mcp-server",
     "tail": "turbo run tail --filter=@gc-erp/mcp-server",
@@ -30,7 +30,6 @@
     "db:reset:local": "bun run --cwd packages/dev-tools db:reset:local",
     "install:mcp:local": "bun run --cwd packages/dev-tools install:mcp:local",
     "install:mcp:prod": "bun run --cwd packages/dev-tools install:mcp:prod",
-    "install-agent-config": "turbo run install-agent-config --filter=@gc-erp/agent-config",
     "infra:status": "bun run --cwd packages/infra infra:status",
     "infra:apply": "bun run --cwd packages/infra infra:apply",
     "infra:teardown": "bun run --cwd packages/infra infra:teardown"
