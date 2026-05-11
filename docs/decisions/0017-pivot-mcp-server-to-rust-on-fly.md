@@ -18,7 +18,7 @@ Three project-specific reasons argue for switching to Rust:
 
 The dogfood-pause moment makes this the cheapest pivot window: M3 (Apps SDK cost-entry-form) landed 2026-04-20; M4 hadn't kicked off; no real production data; nothing in flight on `main`. Switching now costs less than switching after M4 lands in TypeScript.
 
-OAuth was the candidate concern for Cloudflare lock-in, since [ADR 0012](0012-clerk-for-prod-mcp-oauth.md) sits squarely in the auth path. Verification (read [auth.ts](../../apps/mcp-server/src/auth.ts) + ADR 0012 + [apps/mcp-server/CLAUDE.md](../../apps/mcp-server/CLAUDE.md)): the auth shape is **Clerk = Authorization Server, Worker = Resource Server**. The Worker validates a Clerk-issued JWT against Clerk's JWKS and proxies two `/.well-known` endpoints. None of those steps touches a Cloudflare primitive. `clerk-rs` exists; if it's rough, hand-rolled JWT validation against Clerk's JWKS is ~50 LOC of `jsonwebtoken` + a JWKS cache. **OAuth is not the lock-in.**
+OAuth was the candidate concern for Cloudflare lock-in, since [ADR 0012](0012-clerk-for-prod-mcp-oauth.md) sits squarely in the auth path. Verification (read [auth.ts](../../apps/mcp-server/src/auth.ts) + ADR 0012 + [apps/mcp-server/CLAUDE.md](../../apps/mcp-server/AGENTS.md)): the auth shape is **Clerk = Authorization Server, Worker = Resource Server**. The Worker validates a Clerk-issued JWT against Clerk's JWKS and proxies two `/.well-known` endpoints. None of those steps touches a Cloudflare primitive. `clerk-rs` exists; if it's rough, hand-rolled JWT validation against Clerk's JWKS is ~50 LOC of `jsonwebtoken` + a JWKS cache. **OAuth is not the lock-in.**
 
 The actual Cloudflare-shaped pieces are the `McpAgent` / Durable Objects session model and the D1/R2 storage primitives. Those are what the pivot translates.
 
@@ -78,6 +78,6 @@ The TS Worker is archived in-tree (`apps/mcp-server.ts-archive/`) through P3. If
 
 Decision shaped in chat (2026-05-11). Key inputs:
 
-- Verification of OAuth's portability (read [auth.ts](../../apps/mcp-server/src/auth.ts) + [ADR 0012](0012-clerk-for-prod-mcp-oauth.md) + [apps/mcp-server/CLAUDE.md](../../apps/mcp-server/CLAUDE.md)) defused the main Cloudflare lock-in concern.
+- Verification of OAuth's portability (read [auth.ts](../../apps/mcp-server/src/auth.ts) + [ADR 0012](0012-clerk-for-prod-mcp-oauth.md) + [apps/mcp-server/CLAUDE.md](../../apps/mcp-server/AGENTS.md)) defused the main Cloudflare lock-in concern.
 - The "P2 hand-coded by Max" sequencing is operator-elected: the data model is where domain knowledge concentrates, and writing it by hand keeps the type-encoding choices in the operator's head.
 - Fly.io vs workers-rs settled on ecosystem grounds (sqlx compile-time query checking + native tokio require a non-WASM target).

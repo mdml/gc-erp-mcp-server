@@ -78,4 +78,4 @@ Concretely, the handler flow is:
 
 ## Advice
 
-Decided in session with Max on 2026-04-17, spike [`docs/spikes/apply-patch-shape.md`](../spikes/apply-patch-shape.md) F3.1. Referenced from [`packages/mcp-server/CLAUDE.md`](../../packages/mcp-server/CLAUDE.md) as the atomicity pattern for any future tool that fans out into multiple table writes.
+Decided in session with Max on 2026-04-17, spike [`docs/spikes/apply-patch-shape.md`](../spikes/apply-patch-shape.md) F3.1. Referenced from [`packages/mcp-server/CLAUDE.md`](../../apps/mcp-server/AGENTS.md) as the atomicity pattern for any future tool that fans out into multiple table writes.

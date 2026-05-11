@@ -360,4 +360,4 @@ Why a dedicated package instead of folding into `mcp-server` or `dev-tools`:
 - **Not `mcp-server`.** mcp-server is the runtime. Keeping schema out of it means the schema can be used by future packages (e.g. a QuickBooks exporter, a pay-app PDF generator) without circular deps back into the Worker.
 - **Not `fixtures`.** Fixtures are test data. The starter activity library is production seed data — it lands in prod on first deploy. Test fixtures (kitchen-remodel integration test) live next to their tests.
 
-New package checklist (per [packages/CLAUDE.md](packages/CLAUDE.md)) applies — including `packages/database/CLAUDE.md` describing the boundary between runtime (schema, client) and tooling (migrations, seeds).
+New package checklist (per [packages/CLAUDE.md](packages/AGENTS.md)) applies — including `packages/database/CLAUDE.md` describing the boundary between runtime (schema, client) and tooling (migrations, seeds).

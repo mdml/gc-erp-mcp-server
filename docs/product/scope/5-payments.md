@@ -48,7 +48,7 @@ Depends on [scope 0](0-foundation.md), [scope 1](1-client-ledger.md) (client-sid
 3. **PDF generation ADR.** Rust PDF stack choice. Probably a focused ADR or a small `docs/guides/rust-pdf.md` per the new-vendor convention.
 4. **G702/G703 rendering.** Implementation; sample output reviewed for fidelity.
 5. **Lien-waiver flow.** Wire [scope 4](4-sub-onboarding.md)'s external-party UX path to lien-waiver request/response.
-6. **Real-job dogfood.** Run it on an actual project. Pause work; log issues; resume per the [`docs/dogfood/CLAUDE.md`](../../dogfood/CLAUDE.md) flow. Fix what breaks. Closes v1.
+6. **Real-job dogfood.** Run it on an actual project. Pause work; log issues; resume per the [`docs/dogfood/CLAUDE.md`](../../dogfood/AGENTS.md) flow. Fix what breaks. Closes v1.
 
 ## Connects to
 

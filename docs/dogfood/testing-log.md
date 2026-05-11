@@ -1,6 +1,6 @@
 # Testing log
 
-Append-only log from dogfooding the deployed MCP server during development pauses. See [CLAUDE.md](CLAUDE.md) for how entries get written and triaged.
+Append-only log from dogfooding the deployed MCP server during development pauses. See [CLAUDE.md](AGENTS.md) for how entries get written and triaged.
 
 ## 2026-04-20 — pause begins (post-M3 deploy)
 
