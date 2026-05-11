@@ -46,7 +46,7 @@ Depends on [scope 0](0-foundation.md) being fully landed. Pairs with [scope 1](1
 2. **Math.** Critical path, slack, earliest-start derivation, holiday-aware working-days.
 3. **Activation state lifecycle.** Projection from events to state; tools for state queries.
 4. **ADR for schedule UI shape (MCP app vs web app vs hybrid).** This is the load-bearing UX decision; needs explicit reasoning before building.
-5. **UI implementation.** Whatever the ADR lands on. If web-app-shaped: small Rust-served HTML with progressive enhancement, or React+TS+shadcn frontend per the language-boundary-at-HTTP principle from [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md). If MCP-app-shaped: another `@modelcontextprotocol/ext-apps` view (or its Rust equivalent).
+5. **UI implementation.** Whatever the ADR lands on. If web-app-shaped: small Rust-served HTML with progressive enhancement, or React+TS+shadcn frontend per the language-boundary-at-HTTP principle from [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md). If MCP-app-shaped: another `@modelcontextprotocol/ext-apps` view (or its Rust equivalent).
 
 ## Connects to
 

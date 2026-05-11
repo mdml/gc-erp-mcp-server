@@ -13,7 +13,7 @@ Two pressures, both internal to how we develop on this project:
 1. **Single-harness lock-in is operationally fragile.** Anthropic's API runs at roughly two-9s reliability and is the most expensive line item in the project's tooling spend. Claude Code is the preferred development harness, but being unable to fall over to another harness (Codex CLI in the terminal; Codex/Claude/other in Zed) during an outage or after a pricing shift is an unhedged risk. The hedge is cheap if structured right.
 2. **Each harness has its own permission and config surface.** Claude Code reads `.claude/settings.json` (currently generated from `packages/agent-config`); Codex reads `AGENTS.md` and its own per-agent config; Zed has yet another shape. If "what verbs exist in this project" lives only in `package.json` scripts + `turbo.json` + agent prompts, every new harness picks that surface up from scratch.
 
-These pressures are independent of [ADR 0015](0015-pivot-mcp-server-to-rust-on-fly.md) (the Rust pivot). Even if the Rust pivot doesn't land, the portability-layer work pays back on its own — and lands sooner.
+These pressures are independent of [ADR 0017](0017-pivot-mcp-server-to-rust-on-fly.md) (the Rust pivot). Even if the Rust pivot doesn't land, the portability-layer work pays back on its own — and lands sooner.
 
 The architectural shape this ADR adopts is a three-layer model:
 

@@ -1,6 +1,6 @@
 # Scope 0 — Foundation
 
-**Why 0:** Foundation gates everything. Without it, scopes 1–5 either don't ship at all or ship on the wrong stack. The strategic decisions are captured in [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md) (stack pivot to Rust + axum + Fly.io) and [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md) (vendor-portable agent harness); this file is the operating plan that turns those ADRs into shipped slices.
+**Why 0:** Foundation gates everything. Without it, scopes 1–5 either don't ship at all or ship on the wrong stack. The strategic decisions are captured in [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md) (stack pivot to Rust + axum + Fly.io) and [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md) (vendor-portable agent harness); this file is the operating plan that turns those ADRs into shipped slices.
 
 ## What this scope is
 
@@ -20,7 +20,12 @@ Foundation lands first because the new Rust stack is where every product scope (
 - Zed configured for multi-agent operation; setup captured in `docs/guides/zed-multi-agent.md`
 - `packages/agent-config` deleted; `bun install` hook removed; per-harness permission surfaces handled at the harness layer against `Bash(just *)` allow
 
-**Rust MCP server slice** (per [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md), phases P1–P4):
+**Secrets handling** (continues [ADR 0015 — dotenvx](../../decisions/0015-dotenvx-secrets-management.md)):
+
+- dotenvx stays as the local-dev secret vehicle, wired into Justfile recipes from Slice A's first commit — `just check` invokes CodeScene which already requires `CS_ACCESS_TOKEN` from `.env.local`, so `bunx dotenvx run -f .env.local -- <cmd>` is the inner wrap for every recipe that touches a secret. Same shape regardless of whether the inner command is `cargo`, `fly`, `bun`, or anything else. Per-developer encrypted-at-rest model unchanged.
+- Prod secrets move from `wrangler secret put` to `fly secrets set` at P4 cutover. Adds: `FLY_API_TOKEN` (deploy), `DATABASE_URL` (Postgres). Retires: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+
+**Rust MCP server slice** (per [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md), phases P1–P4):
 
 - P1 — Disposable POC: smallest possible `axum` + `rmcp` + Clerk JWT validation + `sqlx`/Postgres on Fly.io. Outputs: `docs/guides/rust-mcp.md` + focused stack ADRs (e.g. `clerk-rs` vs hand-rolled JWT, MCP transport shape).
 - P2 — Hand-coded data model: SPEC §1 entities re-encoded in Rust by Max. Domain enums (sum types), `sqlx` queries with build-time checking, error types, newtypes for IDs. Agents walk through idiom; no agent-generated code in this phase.
@@ -30,7 +35,7 @@ Foundation lands first because the new Rust stack is where every product scope (
 ## Out
 
 - **New domain entities or tools** beyond the M3-dogfooded set. Those land in scopes 1–5. Foundation is parity, not expansion.
-- **Workers-rs / WASM dialect.** Explicit no-go per [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md). One Rust dialect at a time; native axum is the target.
+- **Workers-rs / WASM dialect.** Explicit no-go per [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md). One Rust dialect at a time; native axum is the target.
 - **UI work.** Future UIs ride as React + TypeScript + shadcn talking to the Rust backend over HTTP. Foundation doesn't add a frontend.
 - **Multi-region Postgres.** Single-region on Fly is the trade for two-operator scale; revisit if scope changes.
 - **Hibernatable session state.** Cloudflare's `McpAgent` Durable-Object hibernation goes away — replaced with simpler in-memory or Postgres-backed session state.
@@ -65,7 +70,7 @@ Ships first. Lower risk, smaller scope, validates multi-harness flow before ther
 
 PR shape: one slice (`feat/portability-layer`).
 
-### Slice B — Rust MCP server (per [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md), phases P1–P4)
+### Slice B — Rust MCP server (per [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md), phases P1–P4)
 
 Starts after slice A lands (or in parallel via worktree). Phases run sequentially.
 
@@ -78,9 +83,10 @@ The TS Worker is archived in-tree (`apps/mcp-server.ts-archive/`) at the start o
 
 ## Connects to
 
-- [ADR 0015 — Pivot the MCP server to Rust + axum on Fly.io](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md)
+- [ADR 0017 — Pivot the MCP server to Rust + axum on Fly.io](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md)
 - [ADR 0016 — Portability layer (Justfile + multi-harness AGENTS.md, sunset agent-config)](../../decisions/0016-portability-layer-justfile-multi-harness.md)
 - [ADR 0012 — Clerk for prod MCP OAuth](../../decisions/0012-clerk-for-prod-mcp-oauth.md) — auth shape carries over; Worker→axum is just a swap of the resource server
+- [ADR 0015 — dotenvx secrets management](../../decisions/0015-dotenvx-secrets-management.md) — carries over; only the deploy-target secret store changes (Cloudflare → Fly)
 - [ADR 0003 — Storage split](../../decisions/0003-storage-split.md) — D1+R2 is what we're leaving; Postgres+Tigris (or similar) is the new shape, captured by P1's stack ADRs
 - [SPEC.md §1](../../../SPEC.md) — the data model that gets re-encoded in Rust at P2
 - All of [scope 1](1-client-ledger.md), [scope 2](2-bidding.md), [scope 3](3-schedule-deps.md), [scope 4](4-sub-onboarding.md), [scope 5](5-payments.md) — gated on this scope landing

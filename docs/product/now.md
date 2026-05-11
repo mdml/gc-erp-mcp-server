@@ -2,7 +2,7 @@
 
 Short, ordered. Updated at the start/end of each working session (see [retros](../retros/)). If a task moves, cross it off and note where it went. If this file grows past ~20 lines, prune — it's a working doc, not a log.
 
-**Milestone:** [Scope 0 — Foundation](scope/0-foundation.md). Two parallel slices: portability layer (per [ADR 0016](../decisions/0016-portability-layer-justfile-multi-harness.md)) ships first; then the Rust MCP server slice (per [ADR 0015](../decisions/0015-pivot-mcp-server-to-rust-on-fly.md), phases P1 POC → P2 hand-coded data model → P3 tools to parity → P4 cutover). Until scope 0 lands, none of [scopes 1–5](scope/) ship in the new stack.
+**Milestone:** [Scope 0 — Foundation](scope/0-foundation.md). Two parallel slices: portability layer (per [ADR 0016](../decisions/0016-portability-layer-justfile-multi-harness.md)) ships first; then the Rust MCP server slice (per [ADR 0017](../decisions/0017-pivot-mcp-server-to-rust-on-fly.md), phases P1 POC → P2 hand-coded data model → P3 tools to parity → P4 cutover). Until scope 0 lands, none of [scopes 1–5](scope/) ship in the new stack.
 
 ## Up next
 
