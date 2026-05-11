@@ -11,7 +11,7 @@ spike: "0001"
 
 M3 ships the repo's first MCP "app" — a cost-entry form that Claude renders inline, pre-fills from context, and submits via the existing `record_cost` tool. M4 (`job_dashboard`) and M5 (`pay_app_preview`) follow the same pattern. Before building the first form, we had to decide *how* an MCP server attaches UI to a tool result at all.
 
-[Spike 0001](../spikes/0001-mcp-apps-sdk.md) evaluated the rendering landscape. [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) — written under the [post-M2 hygiene retro](../retros/2026-04-19-post-m2-hygiene.md)'s new-vendor-guide convention — then drove a disposable Cloudflare Worker POC that verified or flagged every spike claim against the installed SDK. Both documents point at one candidate with any traction: `@modelcontextprotocol/ext-apps` — the reference implementation of SEP-1865 (status: stable as of 2026-01-26) by the MCP spec authors. Rolling our own would mean re-implementing ~21 JSON-RPC-over-`postMessage` message types plus the host-sandbox handshake for a pattern that's already shipped.
+Spike 0001 evaluated the rendering landscape (deleted per the spike-ephemeral convention once this ADR landed). [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) — written under the [post-M2 hygiene retro](../retros/2026-04-19-post-m2-hygiene.md)'s new-vendor-guide convention — then drove a disposable Cloudflare Worker POC that verified or flagged every spike claim against the installed SDK. Both documents point at one candidate with any traction: `@modelcontextprotocol/ext-apps` — the reference implementation of SEP-1865 (status: stable as of 2026-01-26) by the MCP spec authors. Rolling our own would mean re-implementing ~21 JSON-RPC-over-`postMessage` message types plus the host-sandbox handshake for a pattern that's already shipped.
 
 Key properties the POC verified, which made this ADR possible in one pass rather than a second spike:
 
@@ -48,7 +48,7 @@ Key properties the POC verified, which made this ADR possible in one pass rather
 
 **Quarantine exception (timeboxed):**
 
-- v1.6.0 was published 2026-04-14 → 6 days old at this ADR's date (2026-04-20) → *inside* the repo's 7-day [`minimumReleaseAgeExcludes`](../../bunfig.toml) window. If [M3's slice](../product/milestones.md#m3) lands on 2026-04-20 the dep needs a timeboxed entry; if on/after 2026-04-21 it does not. The slice adds or skips the entry based on its merge date; either way the `minimumReleaseAgeExcludes` line is removed (or never added) once the version crosses the window.
+- v1.6.0 was published 2026-04-14 → 6 days old at this ADR's date (2026-04-20) → *inside* the repo's 7-day [`minimumReleaseAgeExcludes`](../../bunfig.toml) window. If M3's slice lands on 2026-04-20 the dep needs a timeboxed entry; if on/after 2026-04-21 it does not. The slice adds or skips the entry based on its merge date; either way the `minimumReleaseAgeExcludes` line is removed (or never added) once the version crosses the window.
 
 **Unverified end-to-end (to close during M3's first dogfood pass):**
 
@@ -63,8 +63,8 @@ These rows (guide [§7](../guides/mcp-apps.md)) become M3 backlog entries if the
 
 - Claude Desktop or claude.ai drops SEP-1865 support or diverges from the spec materially.
 - `@modelcontextprotocol/ext-apps` is deprecated in favor of a successor extension (SEP-N, N > 1865).
-- Bundle cost grows past a meaningful fraction of the Worker budget as M4/M5 apps land — currently +4.3 KB gz for the SDK plus per-app HTML payload (Vite singlefile keeps this under ~50 KB gz for a single form per spike [§5](../spikes/0001-mcp-apps-sdk.md)).
+- Bundle cost grows past a meaningful fraction of the Worker budget as M4/M5 apps land — currently +4.3 KB gz for the SDK plus per-app HTML payload (Vite singlefile keeps this under ~50 KB gz for a single form per spike §5).
 
 ## Advice
 
-[Spike 0001](../spikes/0001-mcp-apps-sdk.md) laid out the research landscape; the [MCP Apps vendor guide](../guides/mcp-apps.md) — the first exercise of the post-M2-hygiene retro's new-vendor-guide convention — closed five spike-claim deltas by running a disposable Worker against the installed SDK (most load-bearing: the wrangler split-assets landmine and the `getUiCapability` call-site correction). That sequence (spike → vendor-guide POC → ADR) is how this repo takes on a new vendor going forward; this ADR is the first ratification of the pattern.
+Spike 0001 laid out the research landscape; the [MCP Apps vendor guide](../guides/mcp-apps.md) — the first exercise of the post-M2-hygiene retro's new-vendor-guide convention — closed five spike-claim deltas by running a disposable Worker against the installed SDK (most load-bearing: the wrangler split-assets landmine and the `getUiCapability` call-site correction). That sequence (spike → vendor-guide POC → ADR) is how this repo takes on a new vendor going forward; this ADR is the first ratification of the pattern.
