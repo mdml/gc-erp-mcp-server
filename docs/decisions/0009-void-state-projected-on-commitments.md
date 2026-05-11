@@ -53,4 +53,4 @@ The Zod `Commitment` shape in [SPEC §1](../../SPEC.md) stays unchanged — `voi
 
 ## Advice
 
-Decided in session with Max on 2026-04-17 during the first pre-coding pass of `apply_patch`. The fork was surfaced as a schema-shape question per the root [CLAUDE.md](../../CLAUDE.md) invariant ("schema forks are co-owned with Max"); Max picked A without further deliberation once the projection-self-sufficiency argument landed.
+Decided in session with Max on 2026-04-17 during the first pre-coding pass of `apply_patch`. The fork was surfaced as a schema-shape question per the root [CLAUDE.md](../../AGENTS.md) invariant ("schema forks are co-owned with Max"); Max picked A without further deliberation once the projection-self-sufficiency argument landed.

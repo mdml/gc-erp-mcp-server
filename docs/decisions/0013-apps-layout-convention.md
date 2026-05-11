@@ -53,4 +53,4 @@ The existing four library packages (`database`, `dev-tools`, `infra`, `agent-con
 
 The move was surfaced in the [post-M2 hygiene retro](../retros/2026-04-19-post-m2-hygiene.md) and explicitly deferred to this ADR rather than landed as a standalone refactor — the retro's framing was that the convention earns its keep alongside M3's first app, not as a speculative cleanup.
 
-Spike 0001 and [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) (the POC-verified vendor guide) independently arrived at the `apps/<name>/` layout for UI bundles — the scope-noun naming rule from [`packages/CLAUDE.md`](../../packages/CLAUDE.md) extends cleanly to `apps/*`. (Spike 0001 was deleted per the spike-ephemeral convention once this ADR + the vendor guide landed.)
+Spike 0001 and [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) (the POC-verified vendor guide) independently arrived at the `apps/<name>/` layout for UI bundles — the scope-noun naming rule from [`packages/CLAUDE.md`](../../packages/AGENTS.md) extends cleanly to `apps/*`. (Spike 0001 was deleted per the spike-ephemeral convention once this ADR + the vendor guide landed.)

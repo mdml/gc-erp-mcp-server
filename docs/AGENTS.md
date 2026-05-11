@@ -24,15 +24,15 @@ Three files that are *not* under `docs/` but are part of the doc landscape:
 
 ### Product docs (`docs/product/`)
 
-See [product/CLAUDE.md](product/CLAUDE.md). In short: update when scope, milestones, or the backlog shift. Don't duplicate content between product docs and ADRs — the product doc says *what*; the ADR says *why*.
+See [product/CLAUDE.md](product/AGENTS.md). In short: update when scope, milestones, or the backlog shift. Don't duplicate content between product docs and ADRs — the product doc says *what*; the ADR says *why*.
 
 ### Guides (`docs/guides/`)
 
-See [guides/CLAUDE.md](guides/CLAUDE.md). Guides describe **current state**. When a PR lands that changes the architecture described in a guide, update the guide in the same PR. Guides are summaries — always link out to the authoritative source.
+See [guides/CLAUDE.md](guides/AGENTS.md). Guides describe **current state**. When a PR lands that changes the architecture described in a guide, update the guide in the same PR. Guides are summaries — always link out to the authoritative source.
 
 ### ADRs (`docs/decisions/`)
 
-See [decisions/CLAUDE.md](decisions/CLAUDE.md). Create an ADR when making an architectural decision: new dependency, storage strategy, auth model, cross-cutting pattern, or "why X over Y." Once active, never edit the substance of an ADR — supersede it with a new ADR instead. Use [0000-template.md](decisions/0000-template.md) as the starting point.
+See [decisions/CLAUDE.md](decisions/AGENTS.md). Create an ADR when making an architectural decision: new dependency, storage strategy, auth model, cross-cutting pattern, or "why X over Y." Once active, never edit the substance of an ADR — supersede it with a new ADR instead. Use [0000-template.md](decisions/0000-template.md) as the starting point.
 
 ### Spikes (`docs/spikes/`)
 
@@ -50,4 +50,4 @@ A spike is a **time-boxed investigation** that produces a decision, not code. Cr
 
 - **Source code.** It's in `packages/`.
 - **Data model types.** They're in [SPEC.md](../SPEC.md).
-- **Per-package engineering instructions.** Each package has its own CLAUDE.md ([packages/CLAUDE.md](../packages/CLAUDE.md) has the umbrella).
+- **Per-package engineering instructions.** Each package has its own CLAUDE.md ([packages/CLAUDE.md](../packages/AGENTS.md) has the umbrella).

@@ -60,6 +60,6 @@ Known wrangler + Cloudflare gotchas the CLI needs to design around when D1/R2/se
 
 ## Related
 
-- [packages/infra/CLAUDE.md](../../packages/infra/CLAUDE.md) — package-scoped invariants.
+- [packages/infra/CLAUDE.md](../../packages/infra/AGENTS.md) — package-scoped invariants.
 - [docs/guides/ARCHITECTURE.md](../guides/ARCHITECTURE.md) — repo layout + deployment; updated in the same change as this ADR.
 - [ADR 0001](0001-product-is-an-mcp-server.md) — the product is an MCP server; the infra CLI exists to provision what hosts it.

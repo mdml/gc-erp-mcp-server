@@ -22,7 +22,7 @@ Internal CLIs and gate machinery. **Nothing here ships to production** — this 
 
 ## Testing approach
 
-Coverage is enforced, but honestly — most of this package is shell-out orchestration, which is exactly the case where the [coverage exclusion policy](../CLAUDE.md) says "exclude it, don't mock it."
+Coverage is enforced, but honestly — most of this package is shell-out orchestration, which is exactly the case where the [coverage exclusion policy](../AGENTS.md) says "exclude it, don't mock it."
 
 Test the pure parts:
 

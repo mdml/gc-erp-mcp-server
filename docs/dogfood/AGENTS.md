@@ -38,7 +38,7 @@ Entries can be **freeform bullets** (fastest — Max dumps a thought, agent capt
 1. **Read [testing-log.md](testing-log.md)** start to finish for the session(s) being triaged.
 2. **Categorize any freeform entries** — ask Max if genuinely ambiguous. Don't guess and silently route.
 3. **Route each entry to exactly one home:**
-   - Surprises → one-liner in [`docs/retros/draft.md`](../retros/draft.md), date-prefixed, per [retros/CLAUDE.md](../retros/CLAUDE.md) style.
+   - Surprises → one-liner in [`docs/retros/draft.md`](../retros/draft.md), date-prefixed, per [retros/CLAUDE.md](../retros/AGENTS.md) style.
    - Questions / ideas → [`docs/product/backlog.md`](../product/backlog.md) under the right section (Data model, Runtime/MCP, Product wedge, etc.). Brief leanings OK; don't decide — that's an ADR.
    - Next-session tasks → [`docs/product/now.md`](../product/now.md) under "Up next", ordered.
 4. **Mark the triaged date** by adding `*(triaged YYYY-MM-DD — routed to backlog/retros/now)*` under the date heading, so future passes skip it.
@@ -48,12 +48,12 @@ One-write-one-home is the invariant: every raw observation ends up in exactly on
 
 ## When to end the pause
 
-Max calls it. When he does, the usual pre-session rhythm applies (see root [CLAUDE.md](../../CLAUDE.md) "Session rhythm"): read `now.md`, last 1–2 retros, `git log`. The dogfood branch merges back into main via a normal PR, usually bundled with any triage-pass doc updates.
+Max calls it. When he does, the usual pre-session rhythm applies (see root [CLAUDE.md](../../AGENTS.md) "Session rhythm"): read `now.md`, last 1–2 retros, `git log`. The dogfood branch merges back into main via a normal PR, usually bundled with any triage-pass doc updates.
 
 ## What NOT to do
 
 - **Don't commit code changes.** Bugs go in the log. Fixes wait.
-- **Don't write dated retros.** That's `draft.md` plus a future Max-initiated retro ([retros/CLAUDE.md](../retros/CLAUDE.md)).
+- **Don't write dated retros.** That's `draft.md` plus a future Max-initiated retro ([retros/CLAUDE.md](../retros/AGENTS.md)).
 - **Don't duplicate entries** into backlog/retros/now during logging — that's triage's job. One write, one home.
 - **Don't create sub-files under `docs/dogfood/`** without a reason. If a theme warrants its own doc (design note, vendor guide), it probably belongs in `docs/guides/` or as an ADR, not here.
 - **Don't prune the log.** Append-only. Even after triage, entries stay.

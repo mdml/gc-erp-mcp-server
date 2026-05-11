@@ -9,4 +9,4 @@ This file's contents have moved into `docs/` — a thin pointer remains so old r
 - **Data model + job walkthrough** → [SPEC.md](SPEC.md)
 - **Architecture** (repo layout, runtime, deploy, secrets, gates) → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md)
 
-For the broader map of what lives where → [docs/CLAUDE.md](docs/CLAUDE.md).
+For the broader map of what lives where → [docs/CLAUDE.md](docs/AGENTS.md).

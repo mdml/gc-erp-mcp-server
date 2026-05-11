@@ -61,7 +61,7 @@ To change what auto-allows or denies, edit [`.claude/settings.json`](.claude/set
 
 ### Architecture
 
-- **Architectural decisions are recorded in `docs/decisions/`** — create an ADR when introducing a new dependency, storage strategy, auth model, cross-cutting pattern, or any "why X over Y" choice. Once active, never edit the substance of an ADR; supersede it. See [docs/decisions/CLAUDE.md](docs/decisions/CLAUDE.md).
+- **Architectural decisions are recorded in `docs/decisions/`** — create an ADR when introducing a new dependency, storage strategy, auth model, cross-cutting pattern, or any "why X over Y" choice. Once active, never edit the substance of an ADR; supersede it. See [docs/decisions/CLAUDE.md](docs/decisions/AGENTS.md).
 - **Spikes live in `docs/spikes/` and are ephemeral** — once resolved, they become an ADR and the spike file is deleted.
 - **ARCHITECTURE.md reflects current state, not aspiration.** If a PR changes the architecture, it updates [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md) in the same commit.
 
@@ -72,7 +72,7 @@ To change what auto-allows or denies, edit [`.claude/settings.json`](.claude/set
 
 ### Runtime
 
-- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Clerk-issued OAuth JWT validated via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.CLERK_SECRET_KEY` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) and [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
+- Every `/mcp*` request must be authenticated before delegating to `McpAgent`. **Prod:** Clerk-issued OAuth JWT validated via `@clerk/backend`'s `authenticateRequest({ acceptsToken: "oauth_token" })`; **local:** static bearer token constant-time-compared with `timingSafeEqual`. Selector is `env.CLERK_SECRET_KEY` presence. Never add a path that skips the check. New public endpoints live outside the `/mcp` prefix. See [ADR 0012](docs/decisions/0012-clerk-for-prod-mcp-oauth.md) and [apps/mcp-server/CLAUDE.md](apps/mcp-server/AGENTS.md).
 - Don't replace `timingSafeEqual` with `===` in the local-bearer path. Clerk's JWT validation handles its own timing-safety.
 - Durable Object migrations are additive. Editing an existing migration retroactively is a data-loss bug.
 
@@ -122,7 +122,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 
 ## Agent conventions
 
-- **Per-package CLAUDE.md.** Every package (and every app, when we add `apps/`) has its own CLAUDE.md. When creating a new package, the CLAUDE.md is part of the new-package checklist — see [packages/CLAUDE.md](packages/CLAUDE.md).
+- **Per-package CLAUDE.md.** Every package (and every app, when we add `apps/`) has its own CLAUDE.md. When creating a new package, the CLAUDE.md is part of the new-package checklist — see [packages/CLAUDE.md](packages/AGENTS.md).
 - **Co-own the data model.** Schema forks are for Max to resolve. Implementation is for Claude.
 - **Verify CLI surfaces before scripting them.** Before authoring a package.json script that invokes a CLI, confirm the flag shape — run `--help`, Read the tool's source, or query its docs via Context7. Writing a script against an imagined CLI wastes a build-loop iteration.
 - **New vendor → disposable POC → `docs/guides/<vendor>.md`.** Any time we're about to build against a vendor SDK, auth flow, or API we haven't used in this repo before, assume training data is stale and internal claims are aspirational. The first step is not a slice plan or an ADR — it's a 30–60 min disposable POC (scratch Worker, scratch script, whatever's smallest) against the vendor's current docs, then a short [`docs/guides/<vendor>.md`](docs/guides/) capturing what actually works, what the docs got wrong, and what the minimal working shape is. The ADR and slice then cite the guide. Past incidents the absence of this pattern caused: Stytch false-start (half-day lost to a plan built on assumed behavior — [retro](docs/retros/2026-04-19-stytch-path-a-false-start.md)); `type: "http"` bearer-token claim in `dogfood.md` that wasn't actually supported by Claude Desktop. The forcing function is deliberate: owing a vendor guide means you can't skip the POC.
@@ -142,7 +142,7 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **Start:** read [`now.md`](docs/product/now.md) + last 1–2 [retros](docs/retros/) + `git log --oneline -10` against the feature branch. **Audit the top `now.md` item against the actual code before acting** — doc-vs-code drift is the #1 friction in this repo.
 - **Default branching:** feature branch (`slice/N-foo` or `feat/topic`) — either solo-on-branch or parallel agents via `claude --worktree` opening PRs back to the feature branch. Merge to `main` only when the whole feature lands.
 - **During:** question → [backlog](docs/product/backlog.md); decision → ADR or SPEC/TOOLS; architecture → [ARCHITECTURE.md](docs/guides/ARCHITECTURE.md) same commit; invariant → per-package `CLAUDE.md`.
-- **End:** update `now.md` (done → "Recently done", keep ≤3); if anything felt rough or worth remembering, add a one-liner to [`docs/retros/draft.md`](docs/retros/draft.md) — **do not** write a dated retro unless Max explicitly asks ([retros/CLAUDE.md](docs/retros/CLAUDE.md)); commit everything in conventional-commit style. Granularity varies — not one-commit-per-session.
+- **End:** update `now.md` (done → "Recently done", keep ≤3); if anything felt rough or worth remembering, add a one-liner to [`docs/retros/draft.md`](docs/retros/draft.md) — **do not** write a dated retro unless Max explicitly asks ([retros/CLAUDE.md](docs/retros/AGENTS.md)); commit everything in conventional-commit style. Granularity varies — not one-commit-per-session.
 
 ## Quick links for new contributors
 
@@ -151,9 +151,9 @@ How a session flows — applies to humans and agents both. Full walkthrough in [
 - **"I want to know the data-model *big ideas*."** → [docs/guides/ABSTRACTIONS.md](docs/guides/ABSTRACTIONS.md) → Five load-bearing claims.
 - **"I want to know how it's *built*."** → [docs/guides/ARCHITECTURE.md](docs/guides/ARCHITECTURE.md).
 - **"I want to know how a session *flows*."** → [docs/guides/session-workflow.md](docs/guides/session-workflow.md).
-- **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/CLAUDE.md).
-- **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/CLAUDE.md) → `src/schema/<entity>.ts`.
+- **"I want to change a tool's response."** → [apps/mcp-server/CLAUDE.md](apps/mcp-server/AGENTS.md).
+- **"I want to change the data model."** → [SPEC.md §1](SPEC.md) + [packages/database/CLAUDE.md](packages/database/AGENTS.md) → `src/schema/<entity>.ts`.
 - **"I want to add a new secret."** → `bunx dotenvx set NAME VAL -f .env.local` (per ADR 0015). If it needs to reach a turbo task's child process, also add the name to `globalPassThroughEnv` in [turbo.json](turbo.json).
 - **"I want to change what agents can auto-run."** → [`.claude/settings.json`](.claude/settings.json) (Claude Code) and [`.codex/rules/`](.codex/rules/) + [`.codex/config.toml`](.codex/config.toml) (Codex). Hand-maintained per harness.
-- **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/CLAUDE.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.
-- **"I want to make an architectural decision."** → [docs/decisions/CLAUDE.md](docs/decisions/CLAUDE.md) → copy `0000-template.md`.
+- **"I want to provision or tear down remote infra."** → [packages/infra/CLAUDE.md](packages/infra/AGENTS.md) → `src/infra.config.ts` and `bun run infra:{status,apply,teardown}`.
+- **"I want to make an architectural decision."** → [docs/decisions/CLAUDE.md](docs/decisions/AGENTS.md) → copy `0000-template.md`.
