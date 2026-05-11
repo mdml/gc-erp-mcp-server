@@ -4,7 +4,10 @@ id: "0016"
 title: "Portability layer — Justfile + multi-harness AGENTS.md, sunset agent-config"
 status: active
 date: 2026-05-11
+amended: 2026-05-11
 ---
+
+> **Amendment, 2026-05-11 (pre-implementation):** flipped the Layer 1 mechanism — `AGENTS.md` is now the canonical project-context file (vendor-neutral filename); `CLAUDE.md` exists alongside as a thin file importing `@AGENTS.md`. The original "symlink AGENTS.md → CLAUDE.md" wording is preserved below for context but is no longer the chosen mechanism. Also reframed the Zed and Codex pieces against verified vendor research: Zed v1.0's Agent Panel + ACP-integrated external agents, and Codex's Starlark `.rules` permission grammar. Substance of layers 0–2 unchanged. See [scope 0](../product/scope/0-foundation.md) §Engineering plan for the concretized sub-step structure.
 
 ## Context
 
@@ -18,8 +21,8 @@ These pressures are independent of [ADR 0017](0017-pivot-mcp-server-to-rust-on-f
 The architectural shape this ADR adopts is a three-layer model:
 
 - **Layer 0 — verbs** in a Justfile, harness-agnostic.
-- **Layer 1 — context** in AGENTS.md / CLAUDE.md, portable with adapter (symlink for now).
-- **Layer 2 — harness-specific config** (`.claude/`, Codex config, Zed settings), kept thin and delegating to layers 0/1.
+- **Layer 1 — context** in `AGENTS.md` (canonical, vendor-neutral filename); `CLAUDE.md` is a thin file importing `@AGENTS.md` plus any Claude-Code-specific notes. Same pattern per package.
+- **Layer 2 — harness-specific config** (`.claude/`, `.codex/`, `.zed/`), kept thin and delegating to layers 0/1.
 
 Current state worth naming explicitly:
 
@@ -32,9 +35,9 @@ Current state worth naming explicitly:
 **Adopt a vendor-neutral portability layer:**
 
 - **Justfile at repo root** as the canonical agent-facing verb surface. Recipes wrap current `bun` and `turbo run *` invocations; secrets routed through a single `_dotenv` (or equivalent) variable; `default` recipe runs `just --list` so any harness — and any human — discovers the surface immediately. Recipes earn inclusion when they meet at least one of: touches secrets, multi-step composition, varies across environments, used cross-machine, encodes a project convention behind a short verb. Bare wrappers around single commands that already work (`just ls`) don't qualify.
-- **`AGENTS.md` at repo root**, symlinked to `CLAUDE.md` initially. Codex reads `AGENTS.md` by convention; Claude Code reads `CLAUDE.md`; symlink keeps both consumers happy without a sync problem. Promote to a thin shim only if the two ever need to diverge.
-- **Zed configured for multi-agent operation** (Claude Code + Codex initially; Opus for coordination, Codex for building, room for more). Setup captured in [`docs/guides/zed-multi-agent.md`](../guides/zed-multi-agent.md).
-- **Sunset `packages/agent-config`.** Delete the package; remove its `bun install` hook; let each harness manage its own permission surface against the narrow `Bash(just *)` allow + a small deny-list. For solo-operator work the policy-as-code overhead doesn't pay back. The Justfile's git-tracked nature provides the audit trail (adding a recipe is a deliberate commit; that's the review surface).
+- **`AGENTS.md` at repo root as canonical project-context file.** Vendor-neutral filename; Codex reads it directly. `CLAUDE.md` exists alongside as a thin file: `@AGENTS.md` import (Claude Code's native include directive) plus any Claude-Code-specific notes. Same pattern per package. Verified pre-amendment that Claude Code reads only `CLAUDE.md`, not `AGENTS.md` — the stub is required.
+- **Zed v1.0 as agent host.** Use Zed's Agent Panel to launch parallel external-agent threads (Claude Code, Codex) over the Agent Client Protocol (ACP). Worktree-create wired via `.zed/tasks.json`'s `create_worktree` hook to `scripts/bootstrap.sh`; same script runs for `claude --worktree` via `.worktreeinclude` + a SessionStart hook. We do *not* use Zed's own "Zed Agent" thread type (Zed's native AI loop). Setup captured in [`docs/guides/zed.md`](../guides/zed.md).
+- **Sunset `packages/agent-config`.** Delete the package; remove its `bun install` hook; let each harness manage its own permission surface against the narrow `Bash(just *)` allow + a small deny-list. Concretely: a narrow hand-maintained `.claude/settings.json` for Claude Code; a `.codex/config.toml` plus Starlark `.codex/rules/*.star` files for Codex (per Codex's `prefix_rule` grammar). Codex specifics captured in [`docs/guides/codex.md`](../guides/codex.md), including the trust-gate footgun (repo-local `.codex/config.toml` doesn't load until the user accepts the trust prompt on first run). For solo-operator work the policy-as-code overhead doesn't pay back. The Justfile's git-tracked nature provides the audit trail (adding a recipe is a deliberate commit; that's the review surface).
 
 Lands as one PR/slice (`feat/portability-layer`). Independent of ADR 0015; recommended to ship first because it validates the multi-harness story before there's a Rust port to drive through it.
 
