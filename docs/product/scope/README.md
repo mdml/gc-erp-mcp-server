@@ -6,7 +6,7 @@ The five product scopes are ordered: scope 1 ships first, scope 5 ships last. Fo
 
 ## Scopes
 
-- **[0 — Foundation](0-foundation.md).** Rust + axum on Fly.io; Justfile + multi-harness AGENTS.md; sunset `packages/agent-config`. Per [ADR 0015](../../decisions/0015-pivot-mcp-server-to-rust-on-fly.md) (stack pivot) and [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md) (portability layer). Gates everything below.
+- **[0 — Foundation](0-foundation.md).** Rust + axum on Fly.io; Justfile + multi-harness AGENTS.md; sunset `packages/agent-config`. Per [ADR 0017](../../decisions/0017-pivot-mcp-server-to-rust-on-fly.md) (stack pivot) and [ADR 0016](../../decisions/0016-portability-layer-justfile-multi-harness.md) (portability layer). Gates everything below.
 - **[1 — Client-side ledger](1-client-ledger.md).** Most important for mental model. Today the data model only captures what we owe subs; without modeling what clients owe us, "passing through with markup" vs "eating a sub cost" is unrepresentable, and pay-app generation has nothing to anchor on.
 - **[2 — Bidding](2-bidding.md).** Never figured this out. Pre-signed contract tracking is currently invisible — how a `Commitment` came to exist (bid request → bids received → award → signed) is out-of-system today. Forces a real entity-shape decision.
 - **[3 — Schedule dependencies](3-schedule-deps.md).** Unlocks the biggest open questions on UI. Without `Activation.dependsOn`, there's no critical path, no real gantt, no schedule-shape visualization. Forces the MCP-app-vs-web-app decision for the dashboard.

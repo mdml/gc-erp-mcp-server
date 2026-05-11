@@ -1,6 +1,6 @@
 ---
 type: ADR
-id: "0015"
+id: "0017"
 title: "Pivot the MCP server to Rust + axum on Fly.io"
 status: active
 date: 2026-05-11
