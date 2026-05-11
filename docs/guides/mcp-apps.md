@@ -1,8 +1,8 @@
 # MCP Apps — vendor guide
 
-> **What to trust in this guide.** Written from a disposable POC session 2026-04-20 against [`@modelcontextprotocol/ext-apps@1.6.0`](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) (published 2026-04-14) + [`@modelcontextprotocol/sdk@1.29.0`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) + [`agents@0.11.0`](https://www.npmjs.com/package/agents) on a scratch Cloudflare Worker. Everything labeled **verified** was driven end-to-end through wrangler + curl against a live `/mcp` session; everything labeled **unverified** is documented from spec or SDK source but not exercised through a real host (Claude Desktop, claude.ai). When you adopt MCP Apps in `apps/cost-entry-form/`, start by closing the unverified rows.
+> **What to trust in this guide.** Written from a disposable POC session 2026-04-20 against [`@modelcontextprotocol/ext-apps@1.6.0`](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) (published 2026-04-14) + [`@modelcontextprotocol/sdk@1.29.0`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) + [`agents@0.11.0`](https://www.npmjs.com/package/agents) on a scratch Cloudflare Worker. Everything labeled **verified** was driven end-to-end through wrangler + curl against a live `/mcp` session; everything labeled **unverified** is documented from spec or SDK source but not exercised through a real host (Claude Desktop, claude.ai).
 >
-> The deeper dive (rendering model, CSP, security, bundle-cost analysis) lives in [spike 0001](../spikes/0001-mcp-apps-sdk.md). This guide is the *thin, action-oriented* companion — how to actually make one of these things work in our Worker.
+> This is the *thin, action-oriented* vendor guide — how to make one of these things work in our Worker. For the decision rationale, see [ADR 0014](../decisions/0014-mcp-apps-sdk.md).
 
 ## 1. What MCP Apps is
 
@@ -142,7 +142,7 @@ For Desktop-driven testing, add a **separate** `gc-erp-poc` entry to `claude_des
 
 ## 5. Wire-format cheatsheet
 
-The full wire tour is in [spike 0001 §6](../spikes/0001-mcp-apps-sdk.md). The four calls you actually touch on the server:
+The four calls you actually touch on the server:
 
 | Call | Direction | What we send / verify |
 |---|---|---|
@@ -240,8 +240,8 @@ If you truly need a server that registers different *tool shapes* based on capab
 
 When M3's `slice/cost-entry-form` starts, the concrete path is:
 
-1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `apps/mcp-server/package.json`. **Timebox the 7-day quarantine exception** per [spike 0001 §2](../spikes/0001-mcp-apps-sdk.md): the version clears the window on 2026-04-21, so the `minimumReleaseAgeExcludes` entry in [`bunfig.toml`](../../bunfig.toml) is only needed if the slice lands before then. Verify first with `bun pm view @modelcontextprotocol/ext-apps time`.
-2. Scaffold `apps/cost-entry-form/` per spike §8a. The `apps/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
+1. Add `@modelcontextprotocol/ext-apps@1.6.0` to `apps/mcp-server/package.json`.
+2. Scaffold `apps/cost-entry-form/` per the layout convention in [ADR 0013](../decisions/0013-apps-layout-convention.md). The `apps/mcp-server/` Text-loader rule + `import costEntryFormHtml from "@gc-erp/cost-entry-form/dist/cost-entry-form.html"` is the inlining pattern (see §6.4).
 3. Call `registerAppTool` + `registerAppResource` synchronously from `McpAgent.init()`. **Don't** gate on `getUiCapability()` — see §6.8 for the M3 incident that made the gated/`oninitialized` pattern load-bearing broken.
 4. Close the **unverified** rows in §7 during the first dogfood pass. Any row that stays unverified becomes a backlog entry before the slice merges.
 
@@ -252,4 +252,3 @@ Spec, SDK, and reference docs — consult these directly when something here con
 - [Spec 2026-01-26 (SEP-1865)](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
 - [`@modelcontextprotocol/ext-apps` npm](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) — always check `bun pm view … version` before assuming API shape
 - [SDK quickstart](https://github.com/modelcontextprotocol/ext-apps/blob/main/docs/quickstart.md) and [migration from OpenAI Apps](https://github.com/modelcontextprotocol/ext-apps/blob/main/docs/migrate_from_openai_apps.md)
-- [Spike 0001 — MCP Apps SDK](../spikes/0001-mcp-apps-sdk.md)

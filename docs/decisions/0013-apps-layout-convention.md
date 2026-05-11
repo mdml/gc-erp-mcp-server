@@ -19,7 +19,7 @@ Leaving `mcp-server` at `packages/mcp-server/` while scaffolding `apps/cost-entr
 
 ## Decision
 
-**`apps/*` holds user-facing shipping units; `packages/*` holds internal libraries. Move `packages/mcp-server/` → `apps/mcp-server/` as the first commit of [M3's `slice/cost-entry-form`](../product/milestones.md#m3).** Future UI bundles (`apps/cost-entry-form/` in M3, `apps/job-dashboard/` in M4, `apps/pay-app-preview/` in M5) land under `apps/*` from their first commit.
+**`apps/*` holds user-facing shipping units; `packages/*` holds internal libraries. Move `packages/mcp-server/` → `apps/mcp-server/` as the first commit of M3's `slice/cost-entry-form`.** Future UI bundles (`apps/cost-entry-form/` in M3, `apps/job-dashboard/` in M4, `apps/pay-app-preview/` in M5) land under `apps/*` from their first commit.
 
 The existing four library packages (`database`, `dev-tools`, `infra`, `agent-config`) stay under `packages/*` unchanged.
 
@@ -53,4 +53,4 @@ The existing four library packages (`database`, `dev-tools`, `infra`, `agent-con
 
 The move was surfaced in the [post-M2 hygiene retro](../retros/2026-04-19-post-m2-hygiene.md) and explicitly deferred to this ADR rather than landed as a standalone refactor — the retro's framing was that the convention earns its keep alongside M3's first app, not as a speculative cleanup.
 
-[Spike 0001](../spikes/0001-mcp-apps-sdk.md) and [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) (the POC-verified vendor guide) independently arrived at the `apps/<name>/` layout for UI bundles — the scope-noun naming rule from [`packages/CLAUDE.md`](../../packages/CLAUDE.md) extends cleanly to `apps/*`.
+Spike 0001 and [`docs/guides/mcp-apps.md`](../guides/mcp-apps.md) (the POC-verified vendor guide) independently arrived at the `apps/<name>/` layout for UI bundles — the scope-noun naming rule from [`packages/CLAUDE.md`](../../packages/CLAUDE.md) extends cleanly to `apps/*`. (Spike 0001 was deleted per the spike-ephemeral convention once this ADR + the vendor guide landed.)

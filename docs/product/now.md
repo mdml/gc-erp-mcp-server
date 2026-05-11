@@ -7,12 +7,12 @@ Short, ordered. Updated at the start/end of each working session (see [retros](.
 ## Up next
 
 1. **PR `slice/cost-entry-form` → `main`, rebase-merge, delete branch.** Close out the pre-pivot M3 history cleanly so the archive rename (at start of P1) doesn't entangle in-flight TS work.
-2. **Build the portability layer** ([scope 0 slice A](scope/0-foundation.md#slice-a--portability-layer-per-adr-0016), one slice, can be parallel-worktreed):
+2. **Build the portability layer** ([scope 0](scope/0-foundation.md), slice A — one slice, can be parallel-worktreed):
    - Justfile at root: `just check`, `just test`, `just bootstrap`, `just deploy`. Recipes shell out to current `bun` / `turbo`; Rust recipes added at P1.
    - Zed configured for multi-agent (Claude Code + Codex). Capture in `docs/guides/zed-multi-agent.md`.
    - `AGENTS.md` symlinked to `CLAUDE.md`.
    - Sunset `packages/agent-config` (delete + remove `bun install` hook).
-3. **Start P1 — Rust-MCP POC** ([scope 0 slice B, phase P1](scope/0-foundation.md#slice-b--rust-mcp-server-per-adr-0015-phases-p1p4)): rename `apps/mcp-server/` → `apps/mcp-server.ts-archive/`; spike `axum` + `rmcp` + Clerk JWT + `sqlx`/Postgres deployed to Fly.io; write [`docs/guides/rust-mcp.md`](../guides/rust-mcp.md).
+3. **Start P1 — Rust-MCP POC** ([scope 0](scope/0-foundation.md), slice B phase P1): rename `apps/mcp-server/` → `apps/mcp-server.ts-archive/`; spike `axum` + `rmcp` + Clerk JWT + `sqlx`/Postgres deployed to Fly.io; write [`docs/guides/rust-mcp.md`](../guides/rust-mcp.md).
 
 ## In flight
 

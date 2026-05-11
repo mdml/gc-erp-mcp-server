@@ -18,7 +18,7 @@ That plan is partially broken. Verification (2026-04-18):
 
 This blocks cross-device dogfood on mobile/web — which is the explicit point of dogfooding ahead of M6 ("Run a real job"). The [ARCHITECTURE §8](../guides/ARCHITECTURE.md) deferred item "OAuth — current bearer token is fine for two operators; migrate when we cross ~3 users" was based on an incorrect premise: the trigger isn't user-count, it's client-mix. As soon as one operator wants to use claude.ai, we need OAuth.
 
-Secondary context — from [scope.md](../product/scope.md) and Max's stated intent during this session, `gc-erp-mcp-server` is likely the first of several MCP servers Max will build across projects. The auth choice should be a pattern that ports, not a one-off for this repo.
+Secondary context — from scope.md (since restructured into [`docs/product/scope/`](../product/scope/)) and Max's stated intent during this session, `gc-erp-mcp-server` is likely the first of several MCP servers Max will build across projects. The auth choice should be a pattern that ports, not a one-off for this repo.
 
 ## Decision
 
