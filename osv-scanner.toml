@@ -27,3 +27,52 @@ ignoreUntil = "2026-07-28T00:00:00Z"
 # postcss, or via an explicit override. Revisit when the dogfood pause
 # ends and M4 work resumes (or by July 2026, whichever is earlier).
 reason = "postcss CVE — build-time-only transitive via vite for cost-entry-form bundle; never reaches prod runtime"
+
+# The eight entries below cover transitive CVEs in fast-uri, hono, and
+# ip-address — all pulled in by @modelcontextprotocol/sdk@1.29.0 (hono for
+# the MCP transport HTTP server, fast-uri via ajv, ip-address via
+# express-rate-limit). Architectural elimination is scheduled per ADR 0015:
+# scope 0 P4 cutover archives the TS Worker and replaces @modelcontextprotocol/sdk
+# with rmcp (Rust MCP SDK), at which point @modelcontextprotocol/sdk and
+# its transitive dep tree vanish from bun.lock entirely. Suppressions
+# expire 2026-09-01 — if the pivot stalls past then, re-evaluate.
+
+[[IgnoredVulns]]
+id = "GHSA-q3j6-qgpj-74h6"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "fast-uri 3.1.0 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-v39h-62p7-jpjc"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "fast-uri 3.1.0 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-69xw-7hcm-h432"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "hono 4.12.14 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-9vqf-7f2p-gf9v"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "hono 4.12.14 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-hm8q-7f3q-5f36"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "hono 4.12.14 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-p77w-8qqv-26rm"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "hono 4.12.14 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-qp7p-654g-cw7p"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "hono 4.12.14 CVE — transitive via @modelcontextprotocol/sdk; eliminated at scope 0 P4 cutover (ADR 0015)"
+
+[[IgnoredVulns]]
+id = "GHSA-v2v4-37r5-5v8g"
+ignoreUntil = "2026-09-01T00:00:00Z"
+reason = "ip-address 10.1.0 CVE — transitive via @modelcontextprotocol/sdk → express-rate-limit; eliminated at scope 0 P4 cutover (ADR 0015)"
