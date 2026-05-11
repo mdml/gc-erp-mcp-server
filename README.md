@@ -17,7 +17,8 @@ Turbo monorepo:
 
 - `apps/mcp-server/` — the Cloudflare Worker (MCP server). Runtime code.
 - `packages/dev-tools/` — Bun-based internal tools (gate runner, code-health CLI, scenario runner, db helpers).
-- `packages/agent-config/` — single source of truth for Claude Code permissions. Writes `.claude/settings.json` on every `bun install` (see [its CLAUDE.md](packages/agent-config/CLAUDE.md) to change the policy).
+
+Agent permissions are hand-maintained per-harness: [`.claude/settings.json`](.claude/settings.json) for Claude Code, [`.codex/config.toml`](.codex/config.toml) + [`.codex/rules/`](.codex/rules/) for Codex (see [docs/guides/codex.md](docs/guides/codex.md)). Both files are tracked in git; the verb surface is `Bash(just *)` plus a small set of read-only / safe-write commands. See [AGENTS.md § Agent auto-allow](AGENTS.md#agent-auto-allow--command-shapes) for the principle and [ADR 0016](docs/decisions/0016-portability-layer-justfile-multi-harness.md) for the rationale.
 
 Secrets are managed per-developer via [dotenvx](https://dotenvx.com) (per [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md)). Each developer maintains their own:
 
@@ -124,12 +125,12 @@ For claude.ai the first connection pops a browser for Clerk's hosted consent pag
 
 ## Quality gates
 
-`bun install` runs `lefthook install` **and** `install-agent-config` via the `prepare` script. That wires four git hooks and regenerates `.claude/settings.json` from `packages/agent-config`:
+`bun install` runs `lefthook install` via the `prepare` script, which wires four git hooks:
 
 - **pre-commit** — `turbo run lint`, `turbo run typecheck`, and `bash scripts/codescene.sh gate-check` over each staged source file (`.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`, **including** `*.test.*` and dev-tools — every TypeScript file in the staged set must score ≥ 10). Biome handles both lint and format from `biome.json`; run `bun run format` to auto-fix anything Biome flags.
 - **commit-msg** — `commitlint` enforces [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `chore:`, …). Allowed types are the standard set; no research-specific extensions.
 - **pre-push** — three checks in parallel: `bun run gate -- --coverage` (lint + typecheck + test-with-coverage), `osv-scanner` against `bun.lock` for known vulnerabilities, and `bash scripts/codescene.sh gate-check` over **every** TS/JS file modified on the branch vs `origin/main`.
-- **post-checkout** — `packages/agent-config/bootstrap` runs `bun install` and re-installs `.claude/settings.json`. Per [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md), per-developer `.env.local` and `.env.keys` are listed in `.worktreeinclude` and copy in alongside the worktree — no secret-sync step needed. Note: `claude --worktree` branches the new worktree from `origin/HEAD` (not your current local branch) and there's no flag to override — if you're continuing work on a local feature branch, tell the agent which branch to base off and it'll fetch + align per the root `CLAUDE.md`.
+- **post-checkout** — [`scripts/bootstrap.sh`](scripts/bootstrap.sh) runs `bun install` (fast-paths if `node_modules` and `.claude/` already exist). The same script also fires from Zed's `create_worktree` task and Claude Code's / Codex's `SessionStart` hook — three launch paths, one script. Per [ADR 0015](docs/decisions/0015-dotenvx-secrets-management.md), per-developer `.env.local` and `.env.keys` are listed in `.worktreeinclude` and copy in alongside the worktree — no secret-sync step needed. Note: `claude --worktree` branches the new worktree from `origin/HEAD` (not your current local branch) and there's no flag to override — if you're continuing work on a local feature branch, tell the agent which branch to base off and it'll fetch + align per the root [`AGENTS.md`](AGENTS.md).
 - **Code Health (CodeScene)**: every TypeScript file (source + tests + dev-tools, no exclusions) in the staged set or branch diff must score ≥ 10.0. Requires the `cs` CLI (`npm i -g @codescene/codescene-cli`) and a valid `CS_ACCESS_TOKEN` in your `.env.local` (`bunx dotenvx set CS_ACCESS_TOKEN <value> -f .env.local`). The bash wrapper at [`scripts/codescene.sh`](scripts/codescene.sh) sources the token via `bunx dotenvx get` and exports it before `cs check` — sequential per file, by design (parallel cs spawning from inside lefthook + bun deadlocked in earlier attempts). A missing CLI, unset token, or auth/connection failure hard-fails both the pre-commit and pre-push hooks. Contributing to this repo requires a CodeScene seat. Sanity-check the whole repo any time with `bun run code-health` (calls `bash scripts/codescene.sh gate-all`).
 - **Test coverage**: vitest enforces `lines: 90` (overall) and `lines: 70` (per-file glob) per package. Exclusions live in each package's `vitest.config.ts` — subprocess orchestrators and thin CLI entries are excluded rather than mocked.
 
