@@ -9,9 +9,9 @@
 default:
     @just --list
 
-# Install workspace dependencies (triggers lefthook + agent-config bootstrap).
+# Bootstrap a fresh checkout or worktree (install deps; copy env files if Zed-spawned).
 bootstrap:
-    bun install
+    bash scripts/bootstrap.sh
 
 # Full local gate — lint + typecheck + test + code-health.
 check:
