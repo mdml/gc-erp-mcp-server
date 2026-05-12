@@ -2,10 +2,7 @@
   {
     "label": "bootstrap new worktree",
     "command": "bash",
-    "args": [
-      "-lc",
-      "\"$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh\""
-    ],
+    "args": ["$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh"],
     "hooks": ["create_worktree"],
     "reveal": "always",
     "hide": "never"
