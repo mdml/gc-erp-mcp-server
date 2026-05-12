@@ -26,28 +26,30 @@ The CLI is the same artifact behind Zed's Codex adapter.
 |---|---|---|
 | `~/.codex/config.toml` | User-wide | Personal API keys, default model, global trust settings, anything that varies per-machine |
 | `<repo>/.codex/config.toml` | Repo-local | Project policy knobs + MCP servers + hooks. **Loads only after trust prompt** (see §4) |
-| `<repo>/.codex/rules/*.star` | Repo-local | Fine-grained allow/forbid rules (Starlark). Loads with repo config |
+| `<repo>/.codex/rules/*.rules` | Repo-local | Fine-grained allow/forbid rules (Starlark). Codex's runtime auto-discovers files with the `.rules` extension only — `*.star` is ignored at runtime even though `execpolicy check --rules <path>` accepts any extension. |
 
 In this repo the tracked files are:
-- [`.codex/config.toml`](../../.codex/config.toml) — `approval_policy`, `sandbox_mode`, `[mcp_servers.*]`, `[hooks.SessionStart]`.
-- [`.codex/rules/policy.star`](../../.codex/rules/policy.star) — token-prefix allow/forbid rules.
+- [`.codex/config.toml`](../../.codex/config.toml) — `approval_policy`, `sandbox_mode`, `[mcp_servers.*]`.
+- [`.codex/rules/policy.rules`](../../.codex/rules/policy.rules) — token-prefix allow/forbid rules.
 
 ## 4. The trust gate (footgun)
 
 **Repo-local `.codex/config.toml` does NOT load until the user accepts a trust prompt on Codex's first run in the repo.** Until then, only `~/.codex/config.toml` (user-wide) applies, plus default global policy.
 
-This means: a fresh Codex install on Salman's machine, opened in this repo for the first time, will not have our rules in effect. Salman will see a trust prompt; he must accept it for our `.codex/config.toml` + `.codex/rules/policy.star` to take effect.
+This means: a fresh Codex install on Salman's machine, opened in this repo for the first time, will not have our rules in effect. Salman will see a trust prompt; he must accept it for our `.codex/config.toml` + `.codex/rules/policy.rules` to take effect.
 
-After accepting trust, verify with:
+After accepting trust, verify with the CLI validator. **Two non-obvious things about the syntax:** (1) `execpolicy check` always needs `--rules <path>` even when the rules file lives in the canonical `.codex/rules/` location — auto-discovery is runtime-only, not CLI-time; (2) the command must be passed as **unquoted argv tokens**, not a single quoted string, because the CLI uses `trailing_var_arg` clap parsing.
 
 ```bash
-codex execpolicy check 'just check'      # should be: allowed
-codex execpolicy check 'rm -rf .'        # should be: forbidden
-codex execpolicy check 'git push origin main'   # should be: forbidden
-codex execpolicy check 'git push origin slice/foo'  # should be: allowed
+codex execpolicy check --rules .codex/rules/policy.rules just check
+# → {"matchedRules":[{"prefixRuleMatch":{"matchedPrefix":["just"],"decision":"allow"}}],"decision":"allow"}
+
+codex execpolicy check --rules .codex/rules/policy.rules git push origin main           # forbidden
+codex execpolicy check --rules .codex/rules/policy.rules git push origin slice/foo      # allowed
+codex execpolicy check --rules .codex/rules/policy.rules rm -rf .                       # forbidden
 ```
 
-If any of those don't match expectations, trust hasn't been accepted (or the rules file has a syntax error — `codex execpolicy check` reports parse errors).
+If any of those don't match expectations, the rules file has a syntax error (`execpolicy check` exits non-zero with a `failed to parse policy at <path>` message). Empty `matchedRules` means the file loaded fine but the command genuinely didn't match — usually a tokenization mistake (quoted argv) rather than a rule bug.
 
 ## 5. The `prefix_rule` grammar
 

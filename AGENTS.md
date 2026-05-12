@@ -109,7 +109,7 @@ Enforced at three layers (see [docs/guides/ARCHITECTURE.md §6](docs/guides/ARCH
 ### Agent config
 
 - **`.claude/settings.json` is hand-maintained, tracked in git.** No regenerator. Adding an allow/deny pattern is a deliberate commit. No `settings.local.json` escape hatch.
-- **Codex's equivalent is `.codex/config.toml` + `.codex/rules/*.star`.** Each harness manages its own permission surface — Claude uses JSON globs, Codex uses Starlark `prefix_rule` — and we deliberately don't render both from a meta-policy (per [ADR 0016](docs/decisions/0016-portability-layer-justfile-multi-harness.md)).
+- **Codex's equivalent is `.codex/config.toml` + `.codex/rules/*.rules`.** Each harness manages its own permission surface — Claude uses JSON globs, Codex uses Starlark `prefix_rule` — and we deliberately don't render both from a meta-policy (per [ADR 0016](docs/decisions/0016-portability-layer-justfile-multi-harness.md)).
 - **Permission drift goes through a PR.** Both harnesses' files are tracked; surface a permission change rather than patching locally.
 
 ### Secrets
