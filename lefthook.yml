@@ -42,14 +42,3 @@ pre-push:
         files=$(git diff origin/main...HEAD --name-only --diff-filter=AM -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' 2>/dev/null)
         [ -z "$files" ] && exit 0
         echo "$files" | xargs -I{} bash scripts/codescene.sh gate-check {}
-
-post-checkout:
-  # Fires after `git worktree add`, `git clone`, and branch switches.
-  # Bootstrap is idempotent and fast-paths when node_modules and .claude/
-  # both exist. Same script also runs from Zed's `create_worktree` task
-  # and Claude Code's SessionStart hook — three launch paths, one script.
-  # Per ADR 0015, per-developer .env.local + .env.keys are copied into
-  # fresh worktrees by .worktreeinclude — no secret-sync step here.
-  commands:
-    bootstrap:
-      run: bash scripts/bootstrap.sh
