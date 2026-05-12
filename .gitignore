@@ -8,6 +8,10 @@ node_modules/
 .claude/*
 !.claude/settings.json
 
+# Zed worktrees — Zed's create_worktree task drops linked worktrees here
+# (per docs/guides/zed.md). Always per-developer; never committed.
+.worktrees/
+
 # Cloudflare / wrangler
 .wrangler/
 
