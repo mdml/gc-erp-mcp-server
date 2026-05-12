@@ -51,10 +51,7 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
   {
     "label": "bootstrap new worktree",
     "command": "bash",
-    "args": [
-      "-lc",
-      "\"$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh\""
-    ],
+    "args": ["$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh"],
     "hooks": ["create_worktree"],
     "reveal": "always",
     "hide": "never"
@@ -69,7 +66,7 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
 
 The script reads `ZED_WORKTREE_ROOT` to `cd` into the new worktree, then copies `.env.local` / `.env.keys` from `ZED_MAIN_GIT_WORKTREE` (so dotenvx-backed recipes work without re-keying), then runs `bun install`. It's idempotent + has a fast-path so it's cheap to re-run.
 
-`-lc` (login shell) is what makes `bun`, `turbo`, `cargo`, etc. discoverable on `PATH` inside Zed's task runner.
+**Past bug:** the initial config wrapped the args as `"-lc", "\"$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh\""` (verbatim from another project). Zed silently dropped the args layer — task panel showed `Command: /bin/zsh -i -c 'bash'` and the script never ran. Fix: pass the env-var-expanded path as a single `args` element with no escape quotes; Zed expands `$ZED_MAIN_GIT_WORKTREE` itself and passes the resolved path as `argv[1]` to bash. PATH inheritance from Zed's parent shell carries `bun` / `turbo` through without needing a login shell.
 
 **Same script also serves `claude --worktree`** (the Claude Code CLI worktree flow): env files are copied via [`.worktreeinclude`](../../.worktreeinclude), and the script can be run manually or wired into a SessionStart hook in `.claude/settings.json`. One script, two launch paths.
 
@@ -86,7 +83,7 @@ Personal Zed settings (themes, key bindings, default model for Zed Agent) live i
 
 - **Single task hook.** Zed currently documents only `create_worktree`. There's no `session_start` / `pre_thread` etc. If we want script-on-thread-start, that's an `extensions` / `agent_servers` configuration, not a task hook.
 - **ACP adapter version drift.** Built-in adapters lag the vendor CLIs by some amount. If a Codex or Claude Code feature works in the standalone CLI but not in Zed's thread, suspect the adapter; fall back to running the CLI in a Zed terminal pane.
-- **Task hook firing is unverified.** First time someone creates a worktree in Zed here, watch the `reveal: "always"` panel to confirm `bootstrap.sh` actually fires and completes. If it doesn't, the fallback is `just bootstrap` from a Zed terminal pane in the new worktree.
+- **Task hook firing was the first live POC** and it found a bug (see §4's "Past bug" note). Corrected config landed in the same PR as the discovery; needs one more end-to-end run from a fresh Zed worktree post-merge to confirm. Fallback if it ever silently regresses: `just bootstrap` from a Zed terminal pane in the new worktree.
 
 ## 7. Not in scope here
 
