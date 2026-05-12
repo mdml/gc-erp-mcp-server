@@ -21,9 +21,7 @@ args = ["@codescene/codehealth-mcp"]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
 
-# Hooks — fire scripts/bootstrap.sh on session start to match Zed's
-# create_worktree task (.zed/tasks.json) and Claude Code's SessionStart
-# hook (.claude/settings.json). Three launch paths, one script.
-
-[hooks.SessionStart]
-command = "bash scripts/bootstrap.sh"
+# No SessionStart / hook block here: Codex is launched inside a worktree
+# that Zed's create_worktree task has already bootstrapped. Bare-terminal
+# `git worktree add` + `codex` falls back to `just bootstrap` manually,
+# same as any other non-Zed entry point.
