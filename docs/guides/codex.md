@@ -93,7 +93,7 @@ Codex supports a richer hook set than Claude Code: `PreToolUse`, `PostToolUse`, 
 command = "bash scripts/bootstrap.sh"
 ```
 
-This completes the three-launch-path symmetry: Zed's `create_worktree` task, lefthook's `post-checkout` hook, and Codex's + Claude Code's `SessionStart` hooks all call the same idempotent script. **Hook syntax is unverified end-to-end** — first Codex session in a fresh worktree will confirm.
+This completes the launch-path symmetry: Zed's `create_worktree` task and Claude Code's + Codex's `SessionStart` hooks all call the same idempotent script. **Hook syntax is unverified end-to-end** — first Codex session in a fresh worktree will confirm.
 
 ## 8. Worktrees
 
