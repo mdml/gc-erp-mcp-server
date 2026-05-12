@@ -6,7 +6,7 @@
 # effect after trusting with `codex execpolicy check '<some command>'`.
 
 # Coarse approval gates. Fine-grained allow / forbid lives in
-# rules/policy.star.
+# rules/policy.rules.
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
