@@ -188,7 +188,12 @@
   "enabledMcpjsonServers": ["codescene", "context7"],
   "hooks": {
     "SessionStart": [
-      { "type": "command", "command": "bash scripts/bootstrap.sh" }
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash scripts/bootstrap.sh" }
+        ]
+      }
     ]
   }
 }
