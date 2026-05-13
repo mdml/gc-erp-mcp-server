@@ -9,9 +9,12 @@
 default:
     @just --list
 
-# Bootstrap a fresh checkout or worktree (install deps; copy env files if Zed-spawned).
+# Install workspace dependencies. Idempotent: bun install is a no-op when
+# the lockfile is satisfied. Env-file copy in fresh worktrees happens via
+# the launch-specific glue (Zed's create_worktree task, Claude Code's
+# .worktreeinclude), not here.
 bootstrap:
-    bash scripts/bootstrap.sh
+    bun install
 
 # Full local gate — lint + typecheck + test + code-health.
 check:
