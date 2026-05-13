@@ -2,6 +2,11 @@
 node_modules/
 .turbo/
 
+# Bootstrap mutex — see `just bootstrap` (serializes concurrent installs
+# when Zed's create_worktree task and Claude's SessionStart hook fire on
+# the same fresh worktree).
+.bootstrap.lock/
+
 # Claude Code config — settings.json is hand-maintained and tracked (per
 # ADR 0016 Slice A.4); everything else under .claude/ (projects/, todos/,
 # session state) stays out of git.

@@ -191,7 +191,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "[ -d node_modules ] || bun install" }
+          { "type": "command", "command": "just bootstrap" }
         ]
       }
     ]

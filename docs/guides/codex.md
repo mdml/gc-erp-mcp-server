@@ -88,7 +88,7 @@ Same servers, different config shape — accepted asymmetry between vendors.
 
 ## 7. Hooks
 
-Codex supports a richer hook set than Claude Code: `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SessionStart`, `UserPromptSubmit`, `Stop`. **We don't wire any of them.** Codex sessions in this repo are always launched inside an already-bootstrapped worktree (Zed's `create_worktree` task handles env-file copy + `bun install` before Codex starts), so a Codex-side hook would just duplicate work. Bare-terminal `codex` against a `git worktree add` not done via Zed falls back to `just bootstrap` manually.
+Codex supports a richer hook set than Claude Code: `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SessionStart`, `UserPromptSubmit`, `Stop`. **We don't wire any of them.** Codex sessions in this repo are always launched inside an already-bootstrapped worktree (Zed's `create_worktree` task handles env-file copy + `just bootstrap` before Codex starts), so a Codex-side hook would just duplicate work. Bare-terminal `codex` against a `git worktree add` not done via Zed falls back to `just bootstrap` manually.
 
 ## 8. Worktrees
 
