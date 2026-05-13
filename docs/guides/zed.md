@@ -52,8 +52,8 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
     "label": "bootstrap new worktree",
     "command": "bash",
     "args": [
-      "-lc",
-      "set -e; cd \"$ZED_WORKTREE_ROOT\"; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.local\" .env.local 2>/dev/null || true; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.keys\" .env.keys 2>/dev/null || true; bun install"
+      "-c",
+      "set -e; export PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:$PATH\"; cd \"$ZED_WORKTREE_ROOT\"; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.local\" .env.local 2>/dev/null || true; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.keys\" .env.keys 2>/dev/null || true; bun install"
     ],
     "hooks": ["create_worktree"],
     "reveal": "always",
@@ -68,6 +68,8 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
 - `ZED_MAIN_GIT_WORKTREE` — the main repo's working dir. Equals `ZED_WORKTREE_ROOT` for normal (non-linked) checkouts.
 
 The `cp -n` with `|| true` makes the copy step tolerant of missing source files (e.g. when the main worktree itself doesn't have `.env.local` set up yet). `bun install` is idempotent — a no-op when the lockfile is satisfied.
+
+**Why `bash -c` (not `-lc`) + explicit `export PATH`:** Zed is a GUI app on macOS, so it inherits `launchd`'s PATH (no `~/.bun/bin`). An earlier version used `bash -lc` to get the login-shell PATH from `~/.bash_profile` / `~/.zshrc`, but that piped any verbose shell-init output (rvm, nvm, oh-my-zsh extras) into the task panel. Dropping `-l` and adding `export PATH="$HOME/.bun/bin:/opt/homebrew/bin:$PATH"` to the command body keeps the panel clean and finds bun in both the default install location (`~/.bun/bin`) and the Homebrew location (`/opt/homebrew/bin`). If you installed bun somewhere else, edit the PATH export accordingly.
 
 **`claude --worktree`** (the Claude Code CLI worktree flow) is handled separately by [`.worktreeinclude`](../../.worktreeinclude) (env-file copy) plus a `SessionStart` hook in [`.claude/settings.json`](../../.claude/settings.json) (`bun install`). Different launch path, different glue — no shared script. **Manual fallback** for any worktree spawned outside an agent harness: `just bootstrap`.
 
