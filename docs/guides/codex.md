@@ -88,9 +88,7 @@ Same servers, different config shape — accepted asymmetry between vendors.
 
 ## 7. Hooks
 
-Codex supports a richer hook set than Claude Code: `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SessionStart`, `UserPromptSubmit`, `Stop`. **We don't wire any of them.** Codex sessions in this repo are always launched inside an already-bootstrapped worktree (Zed's `create_worktree` task fires `scripts/bootstrap.sh` before Codex starts), so a Codex-side hook would just duplicate work. Bare-terminal `codex` against a `git worktree add` not done via Zed falls back to `just bootstrap` manually.
-
-**Past bug:** an initial `[hooks.SessionStart] command = "bash scripts/bootstrap.sh"` block here failed Codex startup with `invalid type: map, expected a sequence in 'hooks'` — Codex's actual hooks schema wants an array-of-tables, not a map. The fix was to delete the whole block once we realized the hook was redundant for Zed-launched Codex sessions anyway.
+Codex supports a richer hook set than Claude Code: `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SessionStart`, `UserPromptSubmit`, `Stop`. **We don't wire any of them.** Codex sessions in this repo are always launched inside an already-bootstrapped worktree (Zed's `create_worktree` task handles env-file copy + `bun install` before Codex starts), so a Codex-side hook would just duplicate work. Bare-terminal `codex` against a `git worktree add` not done via Zed falls back to `just bootstrap` manually.
 
 ## 8. Worktrees
 

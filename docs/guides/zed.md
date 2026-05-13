@@ -40,9 +40,9 @@ The Agent Panel surfaces *two* thread types in the same UI:
 
 This boundary is intentional. Our work happens in the vendor harnesses we already trust (Claude Code, Codex). Zed contributes the multi-pane UI and the worktree task hook (§4) — not the agent loop.
 
-## 4. Worktree bootstrap — Zed task + bootstrap script (verified-by-docs)
+## 4. Worktree bootstrap — Zed task (verified-by-docs)
 
-Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.dev/docs/tasks)), which fires after Zed creates a new linked git worktree (CLI or UI modal). We wire it to [`scripts/bootstrap.sh`](../../scripts/bootstrap.sh):
+Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.dev/docs/tasks)), which fires after Zed creates a new linked git worktree (CLI or UI modal). The task inlines the commands directly — no shared script — so the Zed-specific concerns (which env vars are set, what gets copied from where) stay in the Zed config:
 
 **[`.zed/tasks.json`](../../.zed/tasks.json):**
 
@@ -51,7 +51,10 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
   {
     "label": "bootstrap new worktree",
     "command": "bash",
-    "args": ["$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh"],
+    "args": [
+      "-lc",
+      "set -e; cd \"$ZED_WORKTREE_ROOT\"; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.local\" .env.local 2>/dev/null || true; cp -n \"$ZED_MAIN_GIT_WORKTREE/.env.keys\" .env.keys 2>/dev/null || true; bun install"
+    ],
     "hooks": ["create_worktree"],
     "reveal": "always",
     "hide": "never"
@@ -61,14 +64,16 @@ Zed has exactly one documented task hook: `create_worktree` ([docs](https://zed.
 
 **Env vars Zed exposes to tasks** (verified-by-docs):
 
-- `ZED_WORKTREE_ROOT` — the new worktree's root (current task cwd's worktree).
+- `ZED_WORKTREE_ROOT` — the new worktree's root.
 - `ZED_MAIN_GIT_WORKTREE` — the main repo's working dir. Equals `ZED_WORKTREE_ROOT` for normal (non-linked) checkouts.
 
-The script reads `ZED_WORKTREE_ROOT` to `cd` into the new worktree, then copies `.env.local` / `.env.keys` from `ZED_MAIN_GIT_WORKTREE` (so dotenvx-backed recipes work without re-keying), then runs `bun install`. It's idempotent + has a fast-path so it's cheap to re-run.
+The `cp -n` with `|| true` makes the copy step tolerant of missing source files (e.g. when the main worktree itself doesn't have `.env.local` set up yet). `bun install` is idempotent — a no-op when the lockfile is satisfied.
 
-**Past bug:** the initial config wrapped the args as `"-lc", "\"$ZED_MAIN_GIT_WORKTREE/scripts/bootstrap.sh\""` (verbatim from another project). Zed silently dropped the args layer — task panel showed `Command: /bin/zsh -i -c 'bash'` and the script never ran. Fix: pass the env-var-expanded path as a single `args` element with no escape quotes; Zed expands `$ZED_MAIN_GIT_WORKTREE` itself and passes the resolved path as `argv[1]` to bash. PATH inheritance from Zed's parent shell carries `bun` / `turbo` through without needing a login shell.
+**`claude --worktree`** (the Claude Code CLI worktree flow) is handled separately by [`.worktreeinclude`](../../.worktreeinclude) (env-file copy) plus a `SessionStart` hook in [`.claude/settings.json`](../../.claude/settings.json) (`bun install`). Different launch path, different glue — no shared script. **Manual fallback** for any worktree spawned outside an agent harness: `just bootstrap`.
 
-**Same script also serves `claude --worktree`** (the Claude Code CLI worktree flow): env files are copied via [`.worktreeinclude`](../../.worktreeinclude), and the script can be run manually or wired into a SessionStart hook in `.claude/settings.json`. One script, two launch paths.
+### Past iteration
+
+Earlier versions of this section described a `scripts/bootstrap.sh` shared by Zed + Claude SessionStart + (briefly) lefthook post-checkout. That design embedded Zed-specific env-var lookups inside a "general" bootstrap script, and produced flaky Zed worktree spawns (1-in-N success rate). Inlining the Zed task and giving each launch path its own glue fixed the flake and removed the leaky abstraction. See [retros/draft.md](../retros/draft.md) for the lesson.
 
 ## 5. `.zed/` shape (verified-by-docs)
 
