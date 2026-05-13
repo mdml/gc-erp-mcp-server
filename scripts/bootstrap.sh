@@ -9,9 +9,9 @@
 #   bash scripts/bootstrap.sh --force      # skip fast-path
 #
 # Optional environment:
-#   BOOTSTRAP_ENV_SOURCE   directory to copy .env.local / .env.keys from.
-#                          Falls back to ZED_MAIN_GIT_WORKTREE if set,
-#                          else `git worktree list` (first row = main).
+#   BOOTSTRAP_ENV_SOURCE   directory to copy .env.local / .env.keys from
+#                          (Zed's create_worktree task sets this via
+#                          ZED_MAIN_GIT_WORKTREE; see .zed/tasks.json)
 #
 # Zed editor: invoked from .zed/tasks.json on the create_worktree hook.
 # Claude Code `--worktree`: env files are copied via .worktreeinclude;
@@ -32,15 +32,10 @@ if [ "${1:-}" != "--force" ] \
   exit 0
 fi
 
-# Find the main worktree so we can copy .env.local / .env.keys into a
-# fresh linked worktree without re-keying. Preference order: explicit
-# override, Zed's env var, then `git worktree list` as a fallback (Zed
-# was observed to flake on setting ZED_MAIN_GIT_WORKTREE — the git
-# fallback makes this independent of the task-runner's environment).
+# Copy env files from the main worktree if Zed's create_worktree task
+# pointed us at one (or BOOTSTRAP_ENV_SOURCE was set explicitly), so
+# dotenvx-backed recipes work in the new worktree without re-keying.
 src="${BOOTSTRAP_ENV_SOURCE:-${ZED_MAIN_GIT_WORKTREE:-}}"
-if [ -z "$src" ]; then
-  src=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}' || true)
-fi
 if [ -n "$src" ] && [ "$src" != "$PWD" ]; then
   cp -n "$src/.env.local" .env.local 2>/dev/null || true
   cp -n "$src/.env.keys" .env.keys 2>/dev/null || true
